@@ -45,7 +45,8 @@ export const APTS_INIT = [
 ];
 
 export const statusMeta = {
-  completed: { label: "Concluído", color: "#16a34a", bg: "#f0fdf4", border: "#86efac" },
-  scheduled: { label: "Agendado",  color: "#7B1F6A", bg: "#F7EDF5", border: "#EAD4E4" },
-  cancelled: { label: "Cancelado", color: "#9ca3af", bg: "#f9fafb", border: "#e5e7eb" },
+  completed: { label: "Concluído",       color: "#16a34a", bg: "#f0fdf4", border: "#86efac" },
+  scheduled: { label: "Agendado",        color: "#7B1F6A", bg: "#F7EDF5", border: "#EAD4E4" },
+  cancelled: { label: "Cancelado",       color: "#9ca3af", bg: "#f9fafb", border: "#e5e7eb" },
+  no_show:   { label: "Não compareceu",  color: "#d97706", bg: "#fffbeb", border: "#fde68a" },
 };

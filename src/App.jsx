@@ -6,25 +6,28 @@ import Agenda from "./components/Agenda";
 import Clientes from "./components/Clientes";
 import Servicos from "./components/Servicos";
 import NovoAgendamento from "./components/NovoAgendamento";
+import Usuarios from "./components/Usuarios";
+import Login from "./components/Login";
 import { B } from "./constants/brand";
 import { useBreakpoint } from "./hooks/useBreakpoint";
 
 function normalizeAppointment(a) {
   return {
-    id:        a.id,
-    clientId:  a.client_id,
-    serviceId: a.service_id,
-    date:      a.date,
-    time:      a.time,
-    status:    a.status,
-    notes:     a.notes || "",
-    discount:  a.discount_type
+    id:         a.id,
+    clientId:   a.client_id,
+    serviceId:  a.service_id,
+    employeeId: a.employee_id || null,
+    date:       a.date,
+    time:       a.time,
+    status:     a.status,
+    notes:      a.notes || "",
+    discount:   a.discount_type
       ? { type: a.discount_type, value: Number(a.discount_value) }
       : null,
   };
 }
 
-function Spinner() {
+function Spinner({ text = "Carregando dados…" }) {
   return (
     <div style={{
       display: "flex", alignItems: "center", justifyContent: "center",
@@ -35,7 +38,7 @@ function Spinner() {
         borderTop: `3px solid ${B.brand}`, borderRadius: "50%",
         animation: "spin 0.7s linear infinite",
       }} />
-      <div style={{ fontSize: 13, color: B.muted }}>Carregando dados…</div>
+      <div style={{ fontSize: 13, color: B.muted }}>{text}</div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
@@ -43,39 +46,69 @@ function Spinner() {
 
 export default function App() {
   const { isMobile } = useBreakpoint();
+
+  // ── Auth state ────────────────────────────────────────────────
+  const [session,  setSession]  = useState(undefined); // undefined = ainda carregando
+  const [profile,  setProfile]  = useState(null);
+
+  // ── App data ──────────────────────────────────────────────────
   const [page,         setPage]         = useState("dashboard");
   const [appointments, setAppointments] = useState([]);
   const [clients,      setClients]      = useState([]);
   const [services,     setServices]     = useState([]);
+  const [profiles,     setProfiles]     = useState([]);   // todos os usuários (admin/employee)
   const [loading,      setLoading]      = useState(true);
 
+  // ── Auth listener ─────────────────────────────────────────────
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      setSession(s ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // ── Carregar perfil do usuário logado ─────────────────────────
+  useEffect(() => {
+    if (!session?.user) { setProfile(null); return; }
+    supabase.from("profiles").select("*").eq("id", session.user.id).single()
+      .then(({ data }) => setProfile(data || null));
+  }, [session]);
+
+  // ── Carregar todos os dados ───────────────────────────────────
   const loadAll = useCallback(async () => {
     setLoading(true);
-    const [{ data: svcs }, { data: clts }, { data: apts }] = await Promise.all([
+    const [{ data: svcs }, { data: clts }, { data: apts }, { data: profs }] = await Promise.all([
       supabase.from("services").select("*").order("name"),
       supabase.from("clients").select("*").order("name"),
       supabase.from("appointments").select("*").order("date").order("time"),
+      supabase.from("profiles").select("*").order("name"),
     ]);
     setServices(svcs || []);
     setClients(clts || []);
     setAppointments((apts || []).map(normalizeAppointment));
+    setProfiles(profs || []);
     setLoading(false);
   }, []);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => {
+    if (session) loadAll();
+  }, [session, loadAll]);
 
-  // CLIENTS
+  // ── CLIENTS ───────────────────────────────────────────────────
   const addClient = async (data) => {
     const { data: row } = await supabase
       .from("clients")
-      .insert({ name: data.name, phone: data.phone, birthdate: data.birthdate || null, notes: data.notes || "" })
+      .insert({ name: data.name, phone: data.phone, cpf: data.cpf || "", birthdate: data.birthdate || null, notes: data.notes || "" })
       .select().single();
     if (row) setClients(p => [...p, row]);
     return row;
   };
   const updateClient = async (id, data) => {
     await supabase.from("clients")
-      .update({ name: data.name, phone: data.phone, birthdate: data.birthdate || null, notes: data.notes || "" })
+      .update({ name: data.name, phone: data.phone, cpf: data.cpf || "", birthdate: data.birthdate || null, notes: data.notes || "" })
       .eq("id", id);
     setClients(p => p.map(c => c.id === id ? { ...c, ...data } : c));
   };
@@ -84,7 +117,7 @@ export default function App() {
     setClients(p => p.filter(c => c.id !== id));
   };
 
-  // SERVICES
+  // ── SERVICES ──────────────────────────────────────────────────
   const addService = async (data) => {
     const { data: row } = await supabase
       .from("services")
@@ -103,13 +136,14 @@ export default function App() {
     setServices(p => p.filter(s => s.id !== id));
   };
 
-  // APPOINTMENTS
+  // ── APPOINTMENTS ──────────────────────────────────────────────
   const addAppointment = async (data) => {
     const { data: row } = await supabase
       .from("appointments")
       .insert({
         client_id:      data.clientId,
         service_id:     data.serviceId,
+        employee_id:    data.employeeId || null,
         date:           data.date,
         time:           data.time,
         status:         "scheduled",
@@ -125,6 +159,18 @@ export default function App() {
     setAppointments(p => p.map(a => a.id === id ? { ...a, status } : a));
   };
 
+  // ── Logout ────────────────────────────────────────────────────
+  const handleLogout = () => supabase.auth.signOut();
+
+  // ── Renderização ──────────────────────────────────────────────
+
+  // Ainda resolvendo sessão
+  if (session === undefined) return <Spinner text="Verificando autenticação…" />;
+
+  // Não logado
+  if (!session) return <Login />;
+
+  // Carregando dados
   if (loading) return <Spinner />;
 
   const mainStyle = {
@@ -135,6 +181,8 @@ export default function App() {
     minHeight: "100vh",
     maxHeight: isMobile ? "none" : "100vh",
   };
+
+  const isAdmin = profile?.role === "admin";
 
   return (
     <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", background: "#F9F7F9", minHeight: "100vh", display: "flex" }}>
@@ -148,14 +196,14 @@ export default function App() {
         button:not(:disabled):hover { filter: brightness(0.94); }
       `}</style>
 
-      <Sidebar page={page} setPage={setPage} />
+      <Sidebar page={page} setPage={setPage} profile={profile} onLogout={handleLogout} />
 
       <main style={mainStyle}>
         {page === "dashboard" && (
-          <Dashboard appointments={appointments} clients={clients} services={services} setPage={setPage} />
+          <Dashboard appointments={appointments} clients={clients} services={services} setPage={setPage} profile={profile} profiles={profiles} />
         )}
         {page === "agenda" && (
-          <Agenda appointments={appointments} onUpdateStatus={updateAppointmentStatus} clients={clients} services={services} setPage={setPage} />
+          <Agenda appointments={appointments} onUpdateStatus={updateAppointmentStatus} clients={clients} services={services} setPage={setPage} profiles={profiles} profile={profile} />
         )}
         {page === "clientes" && (
           <Clientes clients={clients} onAdd={addClient} onUpdate={updateClient} onDelete={deleteClient} appointments={appointments} services={services} setPage={setPage} />
@@ -163,8 +211,11 @@ export default function App() {
         {page === "servicos" && (
           <Servicos services={services} onAdd={addService} onUpdate={updateService} onDelete={deleteService} />
         )}
+        {page === "usuarios" && isAdmin && (
+          <Usuarios profiles={profiles} onRefresh={loadAll} />
+        )}
         {page === "novo" && (
-          <NovoAgendamento clients={clients} onAddClient={addClient} services={services} onSubmit={addAppointment} onCancel={() => setPage("agenda")} />
+          <NovoAgendamento clients={clients} onAddClient={addClient} services={services} profiles={profiles} onSubmit={addAppointment} onCancel={() => setPage("agenda")} />
         )}
       </main>
     </div>

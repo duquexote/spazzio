@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Plus, Phone, Edit2, History, X, Check, Users, Trash2 } from "lucide-react";
+import { Search, Plus, Phone, Edit2, History, X, Check, Users, Trash2, CreditCard } from "lucide-react";
 import { B } from "../constants/brand";
 import { currency, applyDiscount, ptShort, weekDay } from "../utils/format";
 import Card from "./ui/Card";
@@ -7,6 +7,7 @@ import Avatar from "./ui/Avatar";
 import Btn from "./ui/Btn";
 import Field from "./ui/Field";
 import TextArea from "./ui/TextArea";
+import StatusBadge from "./ui/StatusBadge";
 import { useBreakpoint } from "../hooks/useBreakpoint";
 
 export default function Clientes({ clients, onAdd, onUpdate, onDelete, appointments, services, setPage }) {
@@ -16,7 +17,7 @@ export default function Clientes({ clients, onAdd, onUpdate, onDelete, appointme
   const [modal,  setModal]  = useState(false);
   const [editId, setEditId] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [form,   setForm]   = useState({ name: "", phone: "", birthdate: "", notes: "" });
+  const [form,   setForm]   = useState({ name: "", phone: "", cpf: "", birthdate: "", notes: "" });
   // No mobile, controla se estamos vendo a lista ou o perfil
   const [showProfile, setShowProfile] = useState(false);
 
@@ -24,8 +25,8 @@ export default function Clientes({ clients, onAdd, onUpdate, onDelete, appointme
     c.name.toLowerCase().includes(q.toLowerCase()) || c.phone.includes(q)
   );
 
-  const openAdd  = () => { setForm({ name: "", phone: "", birthdate: "", notes: "" }); setEditId(null); setModal(true); };
-  const openEdit = c  => { setForm({ name: c.name, phone: c.phone, birthdate: c.birthdate || "", notes: c.notes || "" }); setEditId(c.id); setModal(true); };
+  const openAdd  = () => { setForm({ name: "", phone: "", cpf: "", birthdate: "", notes: "" }); setEditId(null); setModal(true); };
+  const openEdit = c  => { setForm({ name: c.name, phone: c.phone, cpf: c.cpf || "", birthdate: c.birthdate || "", notes: c.notes || "" }); setEditId(c.id); setModal(true); };
 
   const save = async () => {
     if (!form.name || !form.phone) return;
@@ -48,11 +49,15 @@ export default function Clientes({ clients, onAdd, onUpdate, onDelete, appointme
 
   const selCl = sel ? clients.find(c => c.id === sel) : null;
   const hist  = selCl
-    ? appointments.filter(a => a.clientId === selCl.id && a.status === "completed").sort((a, b) => b.date.localeCompare(a.date))
+    ? appointments
+        .filter(a => a.clientId === selCl.id && ["completed", "no_show", "cancelled"].includes(a.status))
+        .sort((a, b) => b.date.localeCompare(a.date))
     : [];
+  // Apenas concluídos para cálculos de frequência/gasto
+  const histCompleted = hist.filter(a => a.status === "completed");
 
   const hourBag = {}, dowBag = {}, svcBag = {};
-  hist.forEach(a => {
+  histCompleted.forEach(a => {
     const h = a.time.split(":")[0] + "h";
     hourBag[h] = (hourBag[h] || 0) + 1;
     const w = weekDay(a.date).split("-")[0];
@@ -63,7 +68,7 @@ export default function Clientes({ clients, onAdd, onUpdate, onDelete, appointme
   const favDow     = Object.entries(dowBag).sort((a, b) => b[1] - a[1])[0]?.[0];
   const topSvcId   = Object.entries(svcBag).sort((a, b) => b[1] - a[1])[0]?.[0];
   const topSvcName = topSvcId ? services.find(s => s.id === topSvcId)?.name : null;
-  const totalSpent = hist.reduce((s, a) => {
+  const totalSpent = histCompleted.reduce((s, a) => {
     const sv = services.find(x => x.id === a.serviceId);
     return s + (sv ? applyDiscount(sv.price, a.discount) : 0);
   }, 0);
@@ -79,6 +84,11 @@ export default function Clientes({ clients, onAdd, onUpdate, onDelete, appointme
               <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: B.muted, marginTop: 2 }}>
                 <Phone size={11} /> {selCl.phone}
               </div>
+              {selCl.cpf && (
+                <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: B.muted, marginTop: 1 }}>
+                  <CreditCard size={11} /> CPF: {selCl.cpf}
+                </div>
+              )}
               {selCl.birthdate && <div style={{ fontSize: 12, color: B.muted, marginTop: 1 }}>Nascimento: {ptShort(selCl.birthdate)}</div>}
             </div>
           </div>
@@ -101,7 +111,7 @@ export default function Clientes({ clients, onAdd, onUpdate, onDelete, appointme
         gap: 10,
       }}>
         {[
-          { label: "Visitas",       value: hist.length },
+          { label: "Visitas",       value: histCompleted.length },
           { label: "Total gasto",   value: currency(totalSpent) },
           { label: "Serviço fav.",  value: topSvcName || "—" },
           { label: "Horário usual", value: favHour ? `${favHour} / ${favDow || "—"}` : "—" },
@@ -125,23 +135,25 @@ export default function Clientes({ clients, onAdd, onUpdate, onDelete, appointme
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {hist.map(a => {
                   const sv    = services.find(s => s.id === a.serviceId);
-                  const total = sv ? applyDiscount(sv.price, a.discount) : 0;
+                  const total = sv && a.status === "completed" ? applyDiscount(sv.price, a.discount) : null;
                   return (
                     <div key={a.id} style={{ borderRadius: 8, border: "1px solid #f3f4f6", padding: "10px 12px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                        <span style={{ fontSize: 12, color: B.muted }}>{ptShort(a.date)}</span>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: B.brand }}>{a.time}</span>
+                        <span style={{ fontSize: 12, color: B.muted }}>{ptShort(a.date)} {a.time}</span>
+                        <StatusBadge status={a.status} />
                       </div>
                       <div style={{ fontSize: 13, fontWeight: 600 }}>{sv?.name || "—"}</div>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-                        {a.discount
-                          ? <span style={{ fontSize: 12, color: "#16a34a" }}>
-                              {a.discount.type === "percent" ? `${a.discount.value}% desc.` : `${currency(a.discount.value)} desc.`}
-                            </span>
-                          : <span />
-                        }
-                        <span style={{ fontSize: 13, fontWeight: 700, color: B.brand }}>{currency(total)}</span>
-                      </div>
+                      {total !== null && (
+                        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                          {a.discount
+                            ? <span style={{ fontSize: 12, color: "#16a34a" }}>
+                                {a.discount.type === "percent" ? `${a.discount.value}% desc.` : `${currency(a.discount.value)} desc.`}
+                              </span>
+                            : <span />
+                          }
+                          <span style={{ fontSize: 13, fontWeight: 700, color: B.brand }}>{currency(total)}</span>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -153,7 +165,7 @@ export default function Clientes({ clients, onAdd, onUpdate, onDelete, appointme
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
                     <tr style={{ borderBottom: "2px solid #f3f4f6" }}>
-                      {["Data","Horário","Serviço","Valor","Desconto","Total"].map(h => (
+                      {["Data","Horário","Serviço","Status","Desconto","Total"].map(h => (
                         <th key={h} style={{ textAlign: "left", padding: "5px 8px", fontSize: 10, fontWeight: 600, color: B.muted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
                       ))}
                     </tr>
@@ -161,19 +173,21 @@ export default function Clientes({ clients, onAdd, onUpdate, onDelete, appointme
                   <tbody>
                     {hist.map(a => {
                       const sv    = services.find(s => s.id === a.serviceId);
-                      const total = sv ? applyDiscount(sv.price, a.discount) : 0;
+                      const total = sv && a.status === "completed" ? applyDiscount(sv.price, a.discount) : null;
                       return (
-                        <tr key={a.id} style={{ borderBottom: "1px solid #fafafa" }}>
+                        <tr key={a.id} style={{ borderBottom: "1px solid #fafafa", opacity: a.status !== "completed" ? 0.75 : 1 }}>
                           <td style={{ padding: "8px 8px" }}>{ptShort(a.date)}</td>
                           <td style={{ padding: "8px 8px", fontWeight: 600, color: B.brand }}>{a.time}</td>
                           <td style={{ padding: "8px 8px" }}>{sv?.name || "—"}</td>
-                          <td style={{ padding: "8px 8px", color: B.muted }}>{sv ? currency(sv.price) : "—"}</td>
+                          <td style={{ padding: "8px 8px" }}><StatusBadge status={a.status} /></td>
                           <td style={{ padding: "8px 8px" }}>
-                            {a.discount
+                            {a.discount && a.status === "completed"
                               ? <span style={{ color: "#16a34a", fontWeight: 600 }}>{a.discount.type === "percent" ? `${a.discount.value}%` : currency(a.discount.value)}</span>
                               : "—"}
                           </td>
-                          <td style={{ padding: "8px 8px", fontWeight: 700, color: B.brand }}>{currency(total)}</td>
+                          <td style={{ padding: "8px 8px", fontWeight: 700, color: total ? B.brand : B.muted }}>
+                            {total !== null ? currency(total) : "—"}
+                          </td>
                         </tr>
                       );
                     })}
@@ -278,6 +292,7 @@ export default function Clientes({ clients, onAdd, onUpdate, onDelete, appointme
             <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
               <Field label="Nome completo *"       value={form.name}      onChange={v => setForm(f => ({ ...f, name: v }))}      placeholder="Ex: Maria Silva" />
               <Field label="Telefone / WhatsApp *" value={form.phone}     onChange={v => setForm(f => ({ ...f, phone: v }))}     placeholder="71 99999-0000" />
+              <Field label="CPF"                   value={form.cpf}       onChange={v => setForm(f => ({ ...f, cpf: v }))}       placeholder="000.000.000-00" />
               <Field label="Data de nascimento"    type="date" value={form.birthdate} onChange={v => setForm(f => ({ ...f, birthdate: v }))} />
               <TextArea label="Observações"        value={form.notes}     onChange={v => setForm(f => ({ ...f, notes: v }))}     placeholder="Ex: cabelo fino, alergias..." />
             </div>

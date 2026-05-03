@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Calendar, ChevronLeft, ChevronRight, Phone, Check, X, Plus } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, Phone, Check, X, Plus, UserX } from "lucide-react";
 import { B } from "../constants/brand";
 import { todayStr } from "../constants/data";
 import { currency, applyDiscount, ptFull, weekDay, addDays } from "../utils/format";
@@ -18,23 +18,23 @@ function t2px(time) {
   return (h * 60 + m - START * 60) * (HOUR_H / 60);
 }
 
-export default function Agenda({ appointments, onUpdateStatus, clients, services, setPage }) {
+export default function Agenda({ appointments, onUpdateStatus, clients, services, setPage, profiles, profile }) {
   const { isMobile } = useBreakpoint();
+  const isAdmin = profile?.role === "admin";
   const [date, setDate] = useState(todayStr);
   const [sel,  setSel]  = useState(null);
 
   const dayApts = appointments
-    .filter(a => a.date === date && a.status !== "cancelled")
+    .filter(a => a.date === date && a.status !== "cancelled" && a.status !== "no_show")
     .sort((a, b) => a.time.localeCompare(b.time));
 
-  const markDone   = async (id) => { await onUpdateStatus(id, "completed"); setSel(null); };
-  const markCancel = async (id) => { await onUpdateStatus(id, "cancelled"); setSel(null); };
+  const markStatus = async (id, status) => { await onUpdateStatus(id, status); setSel(null); };
 
   const selA  = sel ? appointments.find(a => a.id === sel) : null;
   const selCl = selA ? clients.find(c => c.id === selA.clientId) : null;
   const selSv = selA ? services.find(s => s.id === selA.serviceId) : null;
+  const selEmp = selA?.employeeId ? profiles.find(p => p.id === selA.employeeId) : null;
 
-  // Painel de detalhes (mobile: modal flutuante, desktop: coluna lateral)
   const detailPanel = selA && selCl && selSv ? (
     <Card style={{ padding: 20 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
@@ -52,11 +52,12 @@ export default function Agenda({ appointments, onUpdateStatus, clients, services
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 14, paddingBottom: 14, borderBottom: "1px solid #f3f4f6" }}>
         {[
-          ["Serviço",  selSv.name],
-          ["Horário",  selA.time],
-          ["Duração",  `${selSv.duration} min`],
-          ...(selA.discount ? [["Desconto", selA.discount.type === "percent" ? `${selA.discount.value}%` : currency(selA.discount.value)]] : []),
-          ["Total",    currency(applyDiscount(selSv.price, selA.discount))],
+          ["Serviço",      selSv.name],
+          ["Horário",      selA.time],
+          ["Duração",      `${selSv.duration} min`],
+          ["Atendente",    selEmp ? selEmp.name : "—"],
+          ...(isAdmin && selA.discount ? [["Desconto", selA.discount.type === "percent" ? `${selA.discount.value}%` : currency(selA.discount.value)]] : []),
+          ...(isAdmin ? [["Total", currency(applyDiscount(selSv.price, selA.discount))]] : []),
         ].map(([k, v]) => (
           <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
             <span style={{ color: B.muted }}>{k}</span>
@@ -70,10 +71,19 @@ export default function Agenda({ appointments, onUpdateStatus, clients, services
         </div>
       )}
       <StatusBadge status={selA.status} />
+
+      {/* Botões de ação — somente quando scheduled */}
       {selA.status === "scheduled" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 12 }}>
-          <Btn variant="success" onClick={() => markDone(selA.id)}><Check size={13} /> Concluir atendimento</Btn>
-          <Btn variant="danger"  onClick={() => markCancel(selA.id)}><X size={13} /> Cancelar</Btn>
+          <Btn variant="success" onClick={() => markStatus(selA.id, "completed")}>
+            <Check size={13} /> Concluir atendimento
+          </Btn>
+          <Btn variant="ghost" onClick={() => markStatus(selA.id, "no_show")} style={{ color: "#d97706", borderColor: "#fde68a", background: "#fffbeb" }}>
+            <UserX size={13} /> Não compareceu
+          </Btn>
+          <Btn variant="danger" onClick={() => markStatus(selA.id, "cancelled")}>
+            <X size={13} /> Cancelou
+          </Btn>
         </div>
       )}
     </Card>
@@ -91,13 +101,13 @@ export default function Agenda({ appointments, onUpdateStatus, clients, services
     <Card style={{ padding: 16 }}>
       <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Resumo do dia</div>
       {[
-        ["Agendamentos", dayApts.length],
-        ["Concluídos",   dayApts.filter(a => a.status === "completed").length],
-        ["Pendentes",    dayApts.filter(a => a.status === "scheduled").length],
-        ["Faturamento",  currency(dayApts.filter(a => a.status === "completed").reduce((s, a) => {
+        ["Agendamentos",    dayApts.length],
+        ["Concluídos",      dayApts.filter(a => a.status === "completed").length],
+        ["Pendentes",       dayApts.filter(a => a.status === "scheduled").length],
+        ...(isAdmin ? [["Faturamento", currency(dayApts.filter(a => a.status === "completed").reduce((s, a) => {
           const sv = services.find(x => x.id === a.serviceId);
           return s + (sv ? applyDiscount(sv.price, a.discount) : 0);
-        }, 0))],
+        }, 0))]] : []),
       ].map(([k, v]) => (
         <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "4px 0", borderBottom: "1px solid #f9fafb" }}>
           <span style={{ color: B.muted }}>{k}</span>
@@ -109,13 +119,12 @@ export default function Agenda({ appointments, onUpdateStatus, clients, services
 
   const timeline = (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-      {/* Navegação de data */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
         <button onClick={() => setDate(addDays(date, -1))} style={{ border: `1.5px solid ${B.border}`, borderRadius: 8, padding: "6px 9px", background: "#fff", cursor: "pointer" }}>
           <ChevronLeft size={15} color={B.brand} />
         </button>
         <div style={{ flex: 1, textAlign: "center" }}>
-          <div style={{ fontFamily: "inherit", fontSize: isMobile ? 16 : 20, fontWeight: 700, color: B.text }}>{ptFull(date)}</div>
+          <div style={{ fontSize: isMobile ? 16 : 20, fontWeight: 700, color: B.text }}>{ptFull(date)}</div>
           <div style={{ fontSize: 12, color: B.muted }}>{weekDay(date)}{date === todayStr ? " — Hoje" : ""}</div>
         </div>
         <button onClick={() => setDate(addDays(date, 1))} style={{ border: `1.5px solid ${B.border}`, borderRadius: 8, padding: "6px 9px", background: "#fff", cursor: "pointer" }}>
@@ -136,14 +145,15 @@ export default function Agenda({ appointments, onUpdateStatus, clients, services
           ))}
 
           {dayApts.map(a => {
-            const sv    = services.find(s => s.id === a.serviceId);
-            const cl    = clients.find(c => c.id === a.clientId);
-            const top   = t2px(a.time);
-            const h     = Math.max((sv?.duration || 60) * (HOUR_H / 60) - 4, 30);
-            const done  = a.status === "completed";
-            const col   = done ? "#16a34a" : B.brand;
-            const bg    = done ? "#f0fdf4" : B.light;
-            const brd   = done ? "#86efac" : B.border;
+            const sv     = services.find(s => s.id === a.serviceId);
+            const cl     = clients.find(c => c.id === a.clientId);
+            const emp    = profiles.find(p => p.id === a.employeeId);
+            const top    = t2px(a.time);
+            const h      = Math.max((sv?.duration || 60) * (HOUR_H / 60) - 4, 30);
+            const done   = a.status === "completed";
+            const col    = done ? "#16a34a" : B.brand;
+            const bg     = done ? "#f0fdf4" : B.light;
+            const brd    = done ? "#86efac" : B.border;
             const active = sel === a.id;
 
             return (
@@ -160,9 +170,9 @@ export default function Agenda({ appointments, onUpdateStatus, clients, services
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: col }}>{a.time}</div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: B.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cl?.name}</div>
-                  {h > 34 && <div style={{ fontSize: 11, color: B.muted }}>{sv?.name}</div>}
+                  {h > 34 && <div style={{ fontSize: 11, color: B.muted }}>{sv?.name}{emp ? ` · ${emp.name}` : ""}</div>}
                 </div>
-                {h > 28 && (
+                {h > 28 && isAdmin && (
                   <div style={{ fontSize: 12, fontWeight: 700, color: col, flexShrink: 0 }}>
                     {sv ? currency(applyDiscount(sv.price, a.discount)) : ""}
                   </div>
@@ -175,14 +185,12 @@ export default function Agenda({ appointments, onUpdateStatus, clients, services
     </div>
   );
 
-  // Mobile: painel de detalhes como modal overlay quando selecionado
+  // Mobile: bottom sheet ao clicar
   if (isMobile) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 12, height: "calc(100vh - 140px)" }}>
         {summaryCard}
         {timeline}
-
-        {/* Modal de detalhes no mobile */}
         {selA && selCl && selSv && (
           <div style={{
             position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
@@ -192,7 +200,6 @@ export default function Agenda({ appointments, onUpdateStatus, clients, services
               width: "100%", background: "#fff", borderRadius: "20px 20px 0 0",
               padding: "20px 20px 36px", maxHeight: "85vh", overflowY: "auto",
             }} onClick={e => e.stopPropagation()}>
-              {/* Handle */}
               <div style={{ width: 40, height: 4, borderRadius: 2, background: "#e5e7eb", margin: "0 auto 16px" }} />
               {detailPanel}
             </div>
@@ -202,7 +209,7 @@ export default function Agenda({ appointments, onUpdateStatus, clients, services
     );
   }
 
-  // Desktop: layout lado a lado
+  // Desktop
   return (
     <div style={{ display: "flex", gap: 18, height: "calc(100vh - 72px)" }}>
       {timeline}

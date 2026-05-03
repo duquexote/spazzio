@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, Search, Plus, Clock, Tag, Percent, Banknote, ChevronLeft, ChevronRight, Check, X } from "lucide-react";
+import { ArrowLeft, Search, Plus, Clock, Tag, Percent, Banknote, ChevronLeft, ChevronRight, Check, X, User2 } from "lucide-react";
 import { B } from "../constants/brand";
 import { todayStr } from "../constants/data";
 import { currency, applyDiscount, ptFull } from "../utils/format";
@@ -11,7 +11,8 @@ import TextArea from "./ui/TextArea";
 import SectionTitle from "./ui/SectionTitle";
 import { useBreakpoint } from "../hooks/useBreakpoint";
 
-const STEPS = ["Cliente", "Serviço", "Data & Hora", "Confirmar"];
+// 5 passos agora: Cliente | Serviço | Atendente | Data&Hora | Confirmar
+const STEPS = ["Cliente", "Serviço", "Atendente", "Data & Hora", "Confirmar"];
 
 const slots = [];
 for (let h = 8; h < 20; h++) {
@@ -19,11 +20,11 @@ for (let h = 8; h < 20; h++) {
   slots.push(`${String(h).padStart(2, "0")}:30`);
 }
 
-export default function NovoAgendamento({ clients, onAddClient, services, onSubmit, onCancel }) {
+export default function NovoAgendamento({ clients, onAddClient, services, profiles, onSubmit, onCancel }) {
   const { isMobile } = useBreakpoint();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
-    clientId: null, serviceId: null,
+    clientId:   null, serviceId: null, employeeId: null,
     date: todayStr, time: "",
     discountOn: false, discountType: "percent", discountValue: "",
     notes: "", addNew: false,
@@ -35,8 +36,12 @@ export default function NovoAgendamento({ clients, onAddClient, services, onSubm
 
   const cl      = clients.find(c => c.id === form.clientId);
   const sv      = services.find(s => s.id === form.serviceId);
+  const emp     = profiles.find(p => p.id === form.employeeId);
   const discObj = form.discountOn && form.discountValue ? { type: form.discountType, value: +form.discountValue } : null;
   const finalP  = sv ? applyDiscount(sv.price, discObj) : 0;
+
+  // Apenas profiles ativos para selecionar como atendente
+  const activeProfiles = profiles.filter(p => p.active);
 
   const filtCl = clients.filter(c =>
     c.name.toLowerCase().includes(cSearch.toLowerCase()) || c.phone.includes(cSearch)
@@ -54,6 +59,7 @@ export default function NovoAgendamento({ clients, onAddClient, services, onSubm
     setSubmitting(true);
     await onSubmit({
       clientId: form.clientId, serviceId: form.serviceId,
+      employeeId: form.employeeId,
       date: form.date, time: form.time,
       discount: discObj, notes: form.notes,
     });
@@ -61,9 +67,10 @@ export default function NovoAgendamento({ clients, onAddClient, services, onSubm
     onCancel();
   };
 
-  const canNext = [form.clientId, form.serviceId, form.date && form.time, true];
+  // canNext por passo (1-indexed): [step1_ok, step2_ok, step3_ok, step4_ok]
+  // Atendente (step 3) é opcional — pode pular
+  const canNext = [form.clientId, form.serviceId, true, form.date && form.time, true];
 
-  // Número de colunas do grid de horários: 4 no mobile, 6 no desktop
   const slotCols = isMobile ? 4 : 6;
 
   return (
@@ -90,7 +97,6 @@ export default function NovoAgendamento({ clients, onAddClient, services, onSubm
               }}>
                 {step > i + 1 ? <Check size={13} /> : i + 1}
               </div>
-              {/* Oculta rótulos no mobile para economizar espaço */}
               {!isMobile && (
                 <div style={{ fontSize: 10, fontWeight: 600, color: step === i + 1 ? B.brand : B.muted, marginTop: 3, textAlign: "center" }}>{s}</div>
               )}
@@ -103,10 +109,11 @@ export default function NovoAgendamento({ clients, onAddClient, services, onSubm
       </div>
 
       <Card style={{ padding: isMobile ? 18 : 26 }}>
-        {/* Step 1 */}
+
+        {/* ── Step 1: Cliente ── */}
         {step === 1 && (
           <div>
-            <div style={{ fontFamily: "inherit", fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Selecionar cliente</div>
+            <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Selecionar cliente</div>
             {!form.addNew ? (
               <>
                 <div style={{ position: "relative", marginBottom: 10 }}>
@@ -156,10 +163,10 @@ export default function NovoAgendamento({ clients, onAddClient, services, onSubm
           </div>
         )}
 
-        {/* Step 2 */}
+        {/* ── Step 2: Serviço ── */}
         {step === 2 && (
           <div>
-            <div style={{ fontFamily: "inherit", fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Serviço e desconto</div>
+            <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Serviço e desconto</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
               {services.filter(s => s.active).map(s => (
                 <div key={s.id} onClick={() => setForm(f => ({ ...f, serviceId: s.id }))} style={{
@@ -173,7 +180,7 @@ export default function NovoAgendamento({ clients, onAddClient, services, onSubm
                     <div style={{ fontSize: 11, color: B.muted, display: "flex", alignItems: "center", gap: 3, marginTop: 1 }}><Clock size={10} /> {s.duration} min</div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                    <div style={{ fontFamily: "inherit", fontSize: 19, fontWeight: 700, color: B.brand }}>{currency(s.price)}</div>
+                    <div style={{ fontSize: 19, fontWeight: 700, color: B.brand }}>{currency(s.price)}</div>
                     {form.serviceId === s.id && <Check size={15} color={B.brand} />}
                   </div>
                 </div>
@@ -230,10 +237,54 @@ export default function NovoAgendamento({ clients, onAddClient, services, onSubm
           </div>
         )}
 
-        {/* Step 3 */}
+        {/* ── Step 3: Atendente ── */}
         {step === 3 && (
           <div>
-            <div style={{ fontFamily: "inherit", fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Data e horário</div>
+            <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>Selecionar atendente</div>
+            <div style={{ fontSize: 13, color: B.muted, marginBottom: 16 }}>Opcional — quem irá realizar o atendimento</div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {/* Opção "Nenhum / Definir depois" */}
+              <div onClick={() => setForm(f => ({ ...f, employeeId: null }))} style={{
+                display: "flex", alignItems: "center", gap: 11, padding: "11px 14px",
+                border: `1.5px solid ${form.employeeId === null ? B.brand : B.border}`,
+                borderRadius: 9, cursor: "pointer",
+                background: form.employeeId === null ? B.light : "#fff", transition: "all 0.15s",
+              }}>
+                <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <User2 size={18} color={B.muted} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>Não definido</div>
+                  <div style={{ fontSize: 11, color: B.muted }}>Definir atendente depois</div>
+                </div>
+                {form.employeeId === null && <Check size={15} color={B.brand} />}
+              </div>
+
+              {/* Perfis ativos */}
+              {activeProfiles.map(p => (
+                <div key={p.id} onClick={() => setForm(f => ({ ...f, employeeId: p.id }))} style={{
+                  display: "flex", alignItems: "center", gap: 11, padding: "11px 14px",
+                  border: `1.5px solid ${form.employeeId === p.id ? B.brand : B.border}`,
+                  borderRadius: 9, cursor: "pointer",
+                  background: form.employeeId === p.id ? B.light : "#fff", transition: "all 0.15s",
+                }}>
+                  <Avatar name={p.name} size={36} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{p.name}</div>
+                    <div style={{ fontSize: 11, color: B.muted }}>{p.role === "admin" ? "Administrador" : "Funcionário"}</div>
+                  </div>
+                  {form.employeeId === p.id && <Check size={15} color={B.brand} />}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 4: Data & Hora ── */}
+        {step === 4 && (
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Data e horário</div>
             <Field label="Data *" type="date" value={form.date} onChange={v => setForm(f => ({ ...f, date: v, time: "" }))} style={{ marginBottom: 16 }} />
             <div style={{ fontWeight: 600, fontSize: 12, color: "#374151", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Selecione o horário</div>
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${slotCols}, 1fr)`, gap: 6, marginBottom: 18 }}>
@@ -250,10 +301,10 @@ export default function NovoAgendamento({ clients, onAddClient, services, onSubm
           </div>
         )}
 
-        {/* Step 4 */}
-        {step === 4 && (
+        {/* ── Step 5: Confirmar ── */}
+        {step === 5 && (
           <div>
-            <div style={{ fontFamily: "inherit", fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Confirmar agendamento</div>
+            <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Confirmar agendamento</div>
             <div style={{ background: B.light, borderRadius: 10, padding: isMobile ? 14 : 20, marginBottom: 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, paddingBottom: 14, borderBottom: `1px solid ${B.border}` }}>
                 <Avatar name={cl?.name || "?"} size={44} />
@@ -263,13 +314,14 @@ export default function NovoAgendamento({ clients, onAddClient, services, onSubm
                 </div>
               </div>
               {[
-                ["Serviço",  sv?.name],
-                ["Data",     ptFull(form.date)],
-                ["Horário",  form.time],
-                ["Duração",  `${sv?.duration} min`],
-                ["Valor",    sv ? currency(sv.price) : "—"],
+                ["Serviço",    sv?.name],
+                ["Data",       ptFull(form.date)],
+                ["Horário",    form.time],
+                ["Duração",    `${sv?.duration} min`],
+                ["Atendente",  emp ? emp.name : "Não definido"],
+                ["Valor",      sv ? currency(sv.price) : "—"],
                 ...(discObj ? [["Desconto", discObj.type === "percent" ? `${discObj.value}%` : currency(discObj.value)]] : []),
-                ["Total",    currency(finalP)],
+                ["Total",      currency(finalP)],
               ].map(([k, v]) => (
                 <div key={k} style={{
                   display: "flex", justifyContent: "space-between", fontSize: k === "Total" ? 15 : 13,
@@ -293,7 +345,7 @@ export default function NovoAgendamento({ clients, onAddClient, services, onSubm
         <Btn variant="ghost" onClick={() => step === 1 ? onCancel() : setStep(s => s - 1)}>
           <ChevronLeft size={14} /> {step === 1 ? "Cancelar" : "Voltar"}
         </Btn>
-        {step < 4
+        {step < STEPS.length
           ? <Btn variant="primary" disabled={!canNext[step - 1]} onClick={() => setStep(s => s + 1)}>
               Continuar <ChevronRight size={14} />
             </Btn>
