@@ -1,0 +1,220 @@
+import { useState } from "react";
+import { Search, Plus, Phone, Edit2, History, X, Check, Users, Trash2 } from "lucide-react";
+import { B } from "../constants/brand";
+import { currency, applyDiscount, ptShort, weekDay } from "../utils/format";
+import Card from "./ui/Card";
+import Avatar from "./ui/Avatar";
+import Btn from "./ui/Btn";
+import Field from "./ui/Field";
+import TextArea from "./ui/TextArea";
+
+export default function Clientes({ clients, onAdd, onUpdate, onDelete, appointments, services, setPage }) {
+  const [q,      setQ]      = useState("");
+  const [sel,    setSel]    = useState(null);
+  const [modal,  setModal]  = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [form,   setForm]   = useState({ name: "", phone: "", birthdate: "", notes: "" });
+
+  const filtered = clients.filter(c =>
+    c.name.toLowerCase().includes(q.toLowerCase()) || c.phone.includes(q)
+  );
+
+  const openAdd  = () => { setForm({ name: "", phone: "", birthdate: "", notes: "" }); setEditId(null); setModal(true); };
+  const openEdit = c  => { setForm({ name: c.name, phone: c.phone, birthdate: c.birthdate || "", notes: c.notes || "" }); setEditId(c.id); setModal(true); };
+
+  const save = async () => {
+    if (!form.name || !form.phone) return;
+    setSaving(true);
+    if (editId) await onUpdate(editId, form);
+    else        await onAdd(form);
+    setSaving(false);
+    setModal(false);
+  };
+
+  const del = async (id) => {
+    await onDelete(id);
+    if (sel === id) setSel(null);
+  };
+
+  const selCl = sel ? clients.find(c => c.id === sel) : null;
+  const hist  = selCl
+    ? appointments.filter(a => a.clientId === selCl.id && a.status === "completed").sort((a, b) => b.date.localeCompare(a.date))
+    : [];
+
+  const hourBag = {}, dowBag = {}, svcBag = {};
+  hist.forEach(a => {
+    const h = a.time.split(":")[0] + "h";
+    hourBag[h] = (hourBag[h] || 0) + 1;
+    const w = weekDay(a.date).split("-")[0];
+    dowBag[w] = (dowBag[w] || 0) + 1;
+    svcBag[a.serviceId] = (svcBag[a.serviceId] || 0) + 1;
+  });
+  const favHour    = Object.entries(hourBag).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const favDow     = Object.entries(dowBag).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const topSvcId   = Object.entries(svcBag).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const topSvcName = topSvcId ? services.find(s => s.id === topSvcId)?.name : null;
+  const totalSpent = hist.reduce((s, a) => {
+    const sv = services.find(x => x.id === a.serviceId);
+    return s + (sv ? applyDiscount(sv.price, a.discount) : 0);
+  }, 0);
+
+  return (
+    <div style={{ display: "flex", gap: 18, height: "calc(100vh - 72px)" }}>
+      {/* List */}
+      <div style={{ width: 290, flexShrink: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", gap: 7 }}>
+          <div style={{ flex: 1, position: "relative" }}>
+            <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: B.muted }} />
+            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar..."
+              style={{ width: "100%", border: `1.5px solid ${B.border}`, borderRadius: 8, padding: "8px 10px 8px 30px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+          </div>
+          <Btn small onClick={openAdd}><Plus size={14} /></Btn>
+        </div>
+
+        <Card style={{ flex: 1, overflowY: "auto", padding: 0 }}>
+          {filtered.length === 0 && (
+            <div style={{ padding: 20, textAlign: "center", fontSize: 13, color: B.muted }}>Nenhuma cliente encontrada</div>
+          )}
+          {filtered.map((c, i) => {
+            const last = appointments.filter(a => a.clientId === c.id && a.status === "completed")
+              .sort((a, b) => b.date.localeCompare(a.date))[0]?.date;
+            return (
+              <div key={c.id} onClick={() => setSel(c.id)} style={{
+                display: "flex", alignItems: "center", gap: 9, padding: "11px 14px",
+                cursor: "pointer", transition: "all 0.1s",
+                background: sel === c.id ? B.light : "transparent",
+                borderBottom: i < filtered.length - 1 ? "1px solid #f5f0f4" : "none",
+                borderLeft: sel === c.id ? `3px solid ${B.brand}` : "3px solid transparent",
+              }}>
+                <Avatar name={c.name} size={34} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: B.text }}>{c.name}</div>
+                  <div style={{ fontSize: 11, color: B.muted }}>{last ? `Última visita: ${ptShort(last)}` : "Sem visitas"}</div>
+                </div>
+              </div>
+            );
+          })}
+        </Card>
+      </div>
+
+      {/* Profile */}
+      <div style={{ flex: 1, overflowY: "auto" }}>
+        {selCl ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <Card style={{ padding: 22 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div style={{ display: "flex", gap: 13, alignItems: "center" }}>
+                  <Avatar name={selCl.name} size={52} />
+                  <div>
+                    <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 700 }}>{selCl.name}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: B.muted, marginTop: 2 }}>
+                      <Phone size={11} /> {selCl.phone}
+                    </div>
+                    {selCl.birthdate && <div style={{ fontSize: 12, color: B.muted, marginTop: 1 }}>Nascimento: {ptShort(selCl.birthdate)}</div>}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 7 }}>
+                  <Btn small variant="outline" onClick={() => openEdit(selCl)}><Edit2 size={12} /> Editar</Btn>
+                  <Btn small onClick={() => setPage("novo")}><Plus size={12} /> Agendar</Btn>
+                  <Btn small variant="danger" onClick={() => del(selCl.id)}><Trash2 size={12} /></Btn>
+                </div>
+              </div>
+              {selCl.notes && (
+                <div style={{ marginTop: 12, background: B.light, borderRadius: 8, padding: "8px 12px", fontSize: 13, color: B.dark, borderLeft: `3px solid ${B.brand}` }}>
+                  {selCl.notes}
+                </div>
+              )}
+            </Card>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+              {[
+                { label: "Visitas",       value: hist.length },
+                { label: "Total gasto",   value: currency(totalSpent) },
+                { label: "Serviço fav.",  value: topSvcName || "—" },
+                { label: "Horário usual", value: favHour ? `${favHour} / ${favDow || "—"}` : "—" },
+              ].map(({ label, value }) => (
+                <Card key={label} style={{ padding: "13px 14px", textAlign: "center" }}>
+                  <div style={{ fontSize: 10, color: B.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: B.brand, marginTop: 4, fontFamily: "'Cormorant Garamond', serif" }}>{value}</div>
+                </Card>
+              ))}
+            </div>
+
+            <Card style={{ padding: 20 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 14, display: "flex", alignItems: "center", gap: 6 }}>
+                <History size={15} color={B.brand} /> Histórico de atendimentos
+              </div>
+              {hist.length === 0
+                ? <div style={{ fontSize: 13, color: B.muted, textAlign: "center", padding: "16px 0" }}>Nenhum atendimento registrado</div>
+                : (
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ borderBottom: "2px solid #f3f4f6" }}>
+                        {["Data","Horário","Serviço","Valor","Desconto","Total"].map(h => (
+                          <th key={h} style={{ textAlign: "left", padding: "5px 8px", fontSize: 10, fontWeight: 600, color: B.muted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {hist.map(a => {
+                        const sv    = services.find(s => s.id === a.serviceId);
+                        const total = sv ? applyDiscount(sv.price, a.discount) : 0;
+                        return (
+                          <tr key={a.id} style={{ borderBottom: "1px solid #fafafa" }}>
+                            <td style={{ padding: "8px 8px" }}>{ptShort(a.date)}</td>
+                            <td style={{ padding: "8px 8px", fontWeight: 600, color: B.brand }}>{a.time}</td>
+                            <td style={{ padding: "8px 8px" }}>{sv?.name || "—"}</td>
+                            <td style={{ padding: "8px 8px", color: B.muted }}>{sv ? currency(sv.price) : "—"}</td>
+                            <td style={{ padding: "8px 8px" }}>
+                              {a.discount
+                                ? <span style={{ color: "#16a34a", fontWeight: 600 }}>{a.discount.type === "percent" ? `${a.discount.value}%` : currency(a.discount.value)}</span>
+                                : "—"}
+                            </td>
+                            <td style={{ padding: "8px 8px", fontWeight: 700, color: B.brand }}>{currency(total)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )
+              }
+            </Card>
+          </div>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
+            <div style={{ textAlign: "center" }}>
+              <Users size={44} color={B.border} style={{ margin: "0 auto 10px" }} />
+              <div style={{ fontSize: 15, fontWeight: 600, color: B.text }}>Selecione uma cliente</div>
+              <div style={{ fontSize: 13, color: B.muted, marginTop: 4 }}>Clique numa cliente para ver o perfil e histórico</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Modal */}
+      {modal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.38)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>
+          <Card style={{ padding: 26, width: 420, maxWidth: "90vw" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 700 }}>{editId ? "Editar cliente" : "Nova cliente"}</div>
+              <button onClick={() => setModal(false)} style={{ border: "none", background: "none", cursor: "pointer" }}><X size={17} color={B.muted} /></button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
+              <Field label="Nome completo *"       value={form.name}      onChange={v => setForm(f => ({ ...f, name: v }))}      placeholder="Ex: Maria Silva" />
+              <Field label="Telefone / WhatsApp *" value={form.phone}     onChange={v => setForm(f => ({ ...f, phone: v }))}     placeholder="71 99999-0000" />
+              <Field label="Data de nascimento"    type="date" value={form.birthdate} onChange={v => setForm(f => ({ ...f, birthdate: v }))} />
+              <TextArea label="Observações"        value={form.notes}     onChange={v => setForm(f => ({ ...f, notes: v }))}     placeholder="Ex: cabelo fino, alergias..." />
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 18, justifyContent: "flex-end" }}>
+              <Btn variant="ghost"   onClick={() => setModal(false)}>Cancelar</Btn>
+              <Btn variant="primary" onClick={save} disabled={!form.name || !form.phone || saving}>
+                <Check size={13} /> {saving ? "Salvando…" : "Salvar"}
+              </Btn>
+            </div>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+}

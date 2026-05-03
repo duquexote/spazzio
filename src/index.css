@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background-color: #F9F7F9;
+    color: #1A1A1A;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #D4A5C9;
+    border-radius: 3px;
+  }
+
+  input[type]:focus,
+  textarea:focus {
+    border-color: #7B1F6A !important;
+    box-shadow: 0 0 0 3px rgba(123, 31, 106, 0.12);
+    outline: none;
+  }
+
+  button:not(:disabled):hover {
+    filter: brightness(0.94);
+  }
+}
+
+@layer utilities {
+  .font-serif {
+    font-family: 'Cormorant Garamond', serif;
+  }
+}
