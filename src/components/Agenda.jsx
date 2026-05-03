@@ -115,7 +115,7 @@ export default function Agenda({ appointments, onUpdateStatus, clients, services
           <ChevronLeft size={15} color={B.brand} />
         </button>
         <div style={{ flex: 1, textAlign: "center" }}>
-          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: isMobile ? 16 : 20, fontWeight: 700, color: B.text }}>{ptFull(date)}</div>
+          <div style={{ fontFamily: "inherit", fontSize: isMobile ? 16 : 20, fontWeight: 700, color: B.text }}>{ptFull(date)}</div>
           <div style={{ fontSize: 12, color: B.muted }}>{weekDay(date)}{date === todayStr ? " — Hoje" : ""}</div>
         </div>
         <button onClick={() => setDate(addDays(date, 1))} style={{ border: `1.5px solid ${B.border}`, borderRadius: 8, padding: "6px 9px", background: "#fff", cursor: "pointer" }}>

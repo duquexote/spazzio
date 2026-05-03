@@ -106,7 +106,7 @@ export default function NovoAgendamento({ clients, onAddClient, services, onSubm
         {/* Step 1 */}
         {step === 1 && (
           <div>
-            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Selecionar cliente</div>
+            <div style={{ fontFamily: "inherit", fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Selecionar cliente</div>
             {!form.addNew ? (
               <>
                 <div style={{ position: "relative", marginBottom: 10 }}>
@@ -159,7 +159,7 @@ export default function NovoAgendamento({ clients, onAddClient, services, onSubm
         {/* Step 2 */}
         {step === 2 && (
           <div>
-            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Serviço e desconto</div>
+            <div style={{ fontFamily: "inherit", fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Serviço e desconto</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
               {services.filter(s => s.active).map(s => (
                 <div key={s.id} onClick={() => setForm(f => ({ ...f, serviceId: s.id }))} style={{
@@ -173,7 +173,7 @@ export default function NovoAgendamento({ clients, onAddClient, services, onSubm
                     <div style={{ fontSize: 11, color: B.muted, display: "flex", alignItems: "center", gap: 3, marginTop: 1 }}><Clock size={10} /> {s.duration} min</div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                    <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 19, fontWeight: 700, color: B.brand }}>{currency(s.price)}</div>
+                    <div style={{ fontFamily: "inherit", fontSize: 19, fontWeight: 700, color: B.brand }}>{currency(s.price)}</div>
                     {form.serviceId === s.id && <Check size={15} color={B.brand} />}
                   </div>
                 </div>
@@ -233,7 +233,7 @@ export default function NovoAgendamento({ clients, onAddClient, services, onSubm
         {/* Step 3 */}
         {step === 3 && (
           <div>
-            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Data e horário</div>
+            <div style={{ fontFamily: "inherit", fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Data e horário</div>
             <Field label="Data *" type="date" value={form.date} onChange={v => setForm(f => ({ ...f, date: v, time: "" }))} style={{ marginBottom: 16 }} />
             <div style={{ fontWeight: 600, fontSize: 12, color: "#374151", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Selecione o horário</div>
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${slotCols}, 1fr)`, gap: 6, marginBottom: 18 }}>
@@ -253,7 +253,7 @@ export default function NovoAgendamento({ clients, onAddClient, services, onSubm
         {/* Step 4 */}
         {step === 4 && (
           <div>
-            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Confirmar agendamento</div>
+            <div style={{ fontFamily: "inherit", fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Confirmar agendamento</div>
             <div style={{ background: B.light, borderRadius: 10, padding: isMobile ? 14 : 20, marginBottom: 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, paddingBottom: 14, borderBottom: `1px solid ${B.border}` }}>
                 <Avatar name={cl?.name || "?"} size={44} />

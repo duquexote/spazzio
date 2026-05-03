@@ -25,7 +25,7 @@ export default function Sidebar({ page, setPage }) {
           boxShadow: "0 1px 8px rgba(123,31,106,0.08)",
         }}>
           <div>
-            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 18, fontWeight: 700, color: B.brand, lineHeight: 1 }}>
+            <div style={{ fontFamily: "inherit", fontSize: 18, fontWeight: 700, color: B.brand, lineHeight: 1 }}>
               Spazzio Diva
             </div>
             <div style={{ fontSize: 9, color: B.muted, fontWeight: 500, letterSpacing: "0.1em", textTransform: "uppercase" }}>
@@ -80,7 +80,7 @@ export default function Sidebar({ page, setPage }) {
       boxShadow: "2px 0 16px rgba(123,31,106,0.05)",
     }}>
       <div style={{ padding: "22px 20px 18px", borderBottom: `1px solid ${B.border}` }}>
-        <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 19, fontWeight: 700, color: B.brand, lineHeight: 1.1 }}>
+        <div style={{ fontFamily: "inherit", fontSize: 19, fontWeight: 700, color: B.brand, lineHeight: 1.1 }}>
           Spazzio Diva
         </div>
         <div style={{ fontSize: 9.5, color: B.muted, fontWeight: 500, letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 2 }}>

@@ -75,7 +75,7 @@ export default function Clientes({ clients, onAdd, onUpdate, onDelete, appointme
           <div style={{ display: "flex", gap: 13, alignItems: "center" }}>
             <Avatar name={selCl.name} size={52} />
             <div>
-              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: isMobile ? 18 : 22, fontWeight: 700 }}>{selCl.name}</div>
+              <div style={{ fontFamily: "inherit", fontSize: isMobile ? 18 : 22, fontWeight: 700 }}>{selCl.name}</div>
               <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: B.muted, marginTop: 2 }}>
                 <Phone size={11} /> {selCl.phone}
               </div>
@@ -108,7 +108,7 @@ export default function Clientes({ clients, onAdd, onUpdate, onDelete, appointme
         ].map(({ label, value }) => (
           <Card key={label} style={{ padding: "13px 14px", textAlign: "center" }}>
             <div style={{ fontSize: 10, color: B.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: B.brand, marginTop: 4, fontFamily: "'Cormorant Garamond', serif" }}>{value}</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: B.brand, marginTop: 4, fontFamily: "inherit" }}>{value}</div>
           </Card>
         ))}
       </div>
@@ -272,7 +272,7 @@ export default function Clientes({ clients, onAdd, onUpdate, onDelete, appointme
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.38)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>
           <Card style={{ padding: 26, width: 420, maxWidth: "90vw" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 700 }}>{editId ? "Editar cliente" : "Nova cliente"}</div>
+              <div style={{ fontFamily: "inherit", fontSize: 20, fontWeight: 700 }}>{editId ? "Editar cliente" : "Nova cliente"}</div>
               <button onClick={() => setModal(false)} style={{ border: "none", background: "none", cursor: "pointer" }}><X size={17} color={B.muted} /></button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>

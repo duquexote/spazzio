@@ -17,7 +17,7 @@ function Stat({ Icon, label, value, sub, accent }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 600, color: B.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: B.text, marginTop: 5, fontFamily: "'Cormorant Garamond', serif" }}>{value}</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: B.text, marginTop: 5, fontFamily: "inherit" }}>{value}</div>
           {sub && <div style={{ fontSize: 12, color: B.muted, marginTop: 1 }}>{sub}</div>}
         </div>
         <div style={{ width: 38, height: 38, borderRadius: 10, background: B.light, display: "flex", alignItems: "center", justifyContent: "center" }}>

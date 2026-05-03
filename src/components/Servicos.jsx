@@ -69,7 +69,7 @@ export default function Servicos({ services, onAdd, onUpdate, onDelete }) {
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, paddingTop: 12, borderTop: "1px solid #f5f0f4" }}>
               <div>
-                <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 700, color: B.brand }}>{currency(s.price)}</div>
+                <div style={{ fontFamily: "inherit", fontSize: 22, fontWeight: 700, color: B.brand }}>{currency(s.price)}</div>
                 <div style={{ fontSize: 11, color: B.muted, display: "flex", alignItems: "center", gap: 3 }}><Clock size={10} /> {s.duration} min</div>
               </div>
               <button onClick={() => toggle(s)} style={{
@@ -89,7 +89,7 @@ export default function Servicos({ services, onAdd, onUpdate, onDelete }) {
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.38)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>
           <Card style={{ padding: 26, width: 400, maxWidth: "90vw" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 700 }}>{editId ? "Editar serviço" : "Novo serviço"}</div>
+              <div style={{ fontFamily: "inherit", fontSize: 20, fontWeight: 700 }}>{editId ? "Editar serviço" : "Novo serviço"}</div>
               <button onClick={() => setModal(false)} style={{ border: "none", background: "none", cursor: "pointer" }}><X size={17} color={B.muted} /></button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>

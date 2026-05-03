@@ -17,7 +17,6 @@ export default {
       },
       fontFamily: {
         sans: ['Plus Jakarta Sans', 'sans-serif'],
-        serif: ['Cormorant Garamond', 'serif'],
       },
     },
   },
