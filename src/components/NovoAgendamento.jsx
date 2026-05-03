@@ -9,6 +9,7 @@ import Btn from "./ui/Btn";
 import Field from "./ui/Field";
 import TextArea from "./ui/TextArea";
 import SectionTitle from "./ui/SectionTitle";
+import { useBreakpoint } from "../hooks/useBreakpoint";
 
 const STEPS = ["Cliente", "Serviço", "Data & Hora", "Confirmar"];
 
@@ -19,6 +20,7 @@ for (let h = 8; h < 20; h++) {
 }
 
 export default function NovoAgendamento({ clients, onAddClient, services, onSubmit, onCancel }) {
+  const { isMobile } = useBreakpoint();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
     clientId: null, serviceId: null,
@@ -61,6 +63,9 @@ export default function NovoAgendamento({ clients, onAddClient, services, onSubm
 
   const canNext = [form.clientId, form.serviceId, form.date && form.time, true];
 
+  // Número de colunas do grid de horários: 4 no mobile, 6 no desktop
+  const slotCols = isMobile ? 4 : 6;
+
   return (
     <div style={{ maxWidth: 620, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 26 }}>
@@ -85,16 +90,19 @@ export default function NovoAgendamento({ clients, onAddClient, services, onSubm
               }}>
                 {step > i + 1 ? <Check size={13} /> : i + 1}
               </div>
-              <div style={{ fontSize: 10, fontWeight: 600, color: step === i + 1 ? B.brand : B.muted, marginTop: 3, textAlign: "center" }}>{s}</div>
+              {/* Oculta rótulos no mobile para economizar espaço */}
+              {!isMobile && (
+                <div style={{ fontSize: 10, fontWeight: 600, color: step === i + 1 ? B.brand : B.muted, marginTop: 3, textAlign: "center" }}>{s}</div>
+              )}
             </div>
             {i < STEPS.length - 1 && (
-              <div style={{ height: 2, flex: 1, background: step > i + 1 ? "#16a34a" : "#e5e7eb", marginBottom: 14, transition: "background 0.3s" }} />
+              <div style={{ height: 2, flex: 1, background: step > i + 1 ? "#16a34a" : "#e5e7eb", marginBottom: isMobile ? 0 : 14, transition: "background 0.3s" }} />
             )}
           </div>
         ))}
       </div>
 
-      <Card style={{ padding: 26 }}>
+      <Card style={{ padding: isMobile ? 18 : 26 }}>
         {/* Step 1 */}
         {step === 1 && (
           <div>
@@ -191,7 +199,7 @@ export default function NovoAgendamento({ clients, onAddClient, services, onSubm
                           flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
                           padding: "8px", border: `1.5px solid ${form.discountType === id ? B.brand : B.border}`,
                           borderRadius: 8, background: form.discountType === id ? B.light : "#fff",
-                          cursor: "pointer", fontFamily: "inherit", fontWeight: 600, fontSize: 12,
+                          cursor: "pointer", fontFamily: "inherit", fontWeight: 600, fontSize: isMobile ? 11 : 12,
                           color: form.discountType === id ? B.brand : B.muted,
                         }}>
                           <Icon size={13} /> {label}
@@ -228,13 +236,13 @@ export default function NovoAgendamento({ clients, onAddClient, services, onSubm
             <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Data e horário</div>
             <Field label="Data *" type="date" value={form.date} onChange={v => setForm(f => ({ ...f, date: v, time: "" }))} style={{ marginBottom: 16 }} />
             <div style={{ fontWeight: 600, fontSize: 12, color: "#374151", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Selecione o horário</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 6, marginBottom: 18 }}>
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${slotCols}, 1fr)`, gap: 6, marginBottom: 18 }}>
               {slots.map(t => (
                 <button key={t} onClick={() => setForm(f => ({ ...f, time: t }))} style={{
-                  padding: "7px 3px", border: `1.5px solid ${form.time === t ? B.brand : B.border}`,
+                  padding: "8px 3px", border: `1.5px solid ${form.time === t ? B.brand : B.border}`,
                   borderRadius: 8, background: form.time === t ? B.brand : "#fff",
                   color: form.time === t ? "#fff" : B.text, cursor: "pointer",
-                  fontFamily: "inherit", fontWeight: 600, fontSize: 12, transition: "all 0.1s",
+                  fontFamily: "inherit", fontWeight: 600, fontSize: isMobile ? 11 : 12, transition: "all 0.1s",
                 }}>{t}</button>
               ))}
             </div>
@@ -246,7 +254,7 @@ export default function NovoAgendamento({ clients, onAddClient, services, onSubm
         {step === 4 && (
           <div>
             <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Confirmar agendamento</div>
-            <div style={{ background: B.light, borderRadius: 10, padding: 20, marginBottom: 14 }}>
+            <div style={{ background: B.light, borderRadius: 10, padding: isMobile ? 14 : 20, marginBottom: 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, paddingBottom: 14, borderBottom: `1px solid ${B.border}` }}>
                 <Avatar name={cl?.name || "?"} size={44} />
                 <div>
@@ -290,7 +298,7 @@ export default function NovoAgendamento({ clients, onAddClient, services, onSubm
               Continuar <ChevronRight size={14} />
             </Btn>
           : <Btn variant="primary" onClick={submit} disabled={submitting}>
-              <Check size={14} /> {submitting ? "Salvando…" : "Confirmar agendamento"}
+              <Check size={14} /> {submitting ? "Salvando…" : "Confirmar"}
             </Btn>
         }
       </div>

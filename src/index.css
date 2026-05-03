@@ -9,11 +9,17 @@
     padding: 0;
   }
 
+  html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
   body {
     font-family: 'Plus Jakarta Sans', sans-serif;
     background-color: #F9F7F9;
     color: #1A1A1A;
     -webkit-font-smoothing: antialiased;
+    touch-action: pan-y;
   }
 
   ::-webkit-scrollbar {

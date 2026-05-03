@@ -1,5 +1,6 @@
 import { LayoutDashboard, Calendar, Users, Scissors, Plus } from "lucide-react";
 import { B } from "../constants/brand";
+import { useBreakpoint } from "../hooks/useBreakpoint";
 
 const NAV = [
   { id: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
@@ -9,6 +10,67 @@ const NAV = [
 ];
 
 export default function Sidebar({ page, setPage }) {
+  const { isMobile } = useBreakpoint();
+
+  // ── Mobile: bottom navigation bar ────────────────────────────
+  if (isMobile) {
+    return (
+      <>
+        {/* Header mobile */}
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
+          background: "#fff", borderBottom: `1px solid ${B.border}`,
+          padding: "12px 16px",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          boxShadow: "0 1px 8px rgba(123,31,106,0.08)",
+        }}>
+          <div>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 18, fontWeight: 700, color: B.brand, lineHeight: 1 }}>
+              Spazzio Diva
+            </div>
+            <div style={{ fontSize: 9, color: B.muted, fontWeight: 500, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+              Salão de Beleza & Estética
+            </div>
+          </div>
+          <button onClick={() => setPage("novo")} style={{
+            display: "flex", alignItems: "center", gap: 5,
+            padding: "8px 13px", borderRadius: 10, border: "none",
+            background: B.brand, color: "#fff", fontFamily: "inherit",
+            fontWeight: 600, fontSize: 13, cursor: "pointer",
+          }}>
+            <Plus size={14} /> Agendar
+          </button>
+        </div>
+
+        {/* Bottom nav */}
+        <div style={{
+          position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 100,
+          background: "#fff", borderTop: `1px solid ${B.border}`,
+          display: "flex", boxShadow: "0 -2px 16px rgba(123,31,106,0.08)",
+        }}>
+          {NAV.map(({ id, label, Icon }) => {
+            const active = page === id;
+            return (
+              <button key={id} onClick={() => setPage(id)} style={{
+                flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
+                gap: 3, padding: "10px 4px 8px", border: "none", cursor: "pointer",
+                background: "transparent",
+                color: active ? B.brand : "#9ca3af",
+                fontFamily: "inherit", fontWeight: active ? 700 : 400, fontSize: 10,
+                borderTop: active ? `2px solid ${B.brand}` : "2px solid transparent",
+                transition: "all 0.15s",
+              }}>
+                <Icon size={20} />
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </>
+    );
+  }
+
+  // ── Desktop: sidebar lateral ──────────────────────────────────
   return (
     <div style={{
       width: 224, minHeight: "100vh", background: "#fff",
@@ -22,7 +84,7 @@ export default function Sidebar({ page, setPage }) {
           Spazzio Diva
         </div>
         <div style={{ fontSize: 9.5, color: B.muted, fontWeight: 500, letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 2 }}>
-          Salão de Beleza &amp; Estética
+          Salão de Beleza & Estética
         </div>
       </div>
 

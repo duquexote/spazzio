@@ -9,6 +9,7 @@ import Avatar from "./ui/Avatar";
 import Btn from "./ui/Btn";
 import SectionTitle from "./ui/SectionTitle";
 import StatusBadge from "./ui/StatusBadge";
+import { useBreakpoint } from "../hooks/useBreakpoint";
 
 function Stat({ Icon, label, value, sub, accent }) {
   return (
@@ -28,6 +29,7 @@ function Stat({ Icon, label, value, sub, accent }) {
 }
 
 export default function Dashboard({ appointments, clients, services, setPage }) {
+  const { isMobile } = useBreakpoint();
   const now = new Date();
   const mStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
   const mEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0];
@@ -79,14 +81,26 @@ export default function Dashboard({ appointments, clients, services, setPage }) 
         <div style={{ fontSize: 14, color: B.muted }}>{ptFull(todayStr)} — {weekDay(todayStr)}</div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 20 }}>
+      {/* Stats grid: 2 colunas no mobile, 4 no desktop */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)",
+        gap: isMobile ? 10 : 14,
+        marginBottom: 20,
+      }}>
         <Stat Icon={DollarSign}   label="Faturamento do mês"    value={currency(faturamento)} sub={`${monthDone.length} atendimentos`} />
         <Stat Icon={CheckCircle}  label="Serviços realizados"   value={monthDone.length} sub="neste mês" accent="#16a34a" />
         <Stat Icon={CalendarCheck} label="Agendamentos futuros" value={agendados.length} sub="a partir de hoje" accent="#d97706" />
         <Stat Icon={TrendingUp}   label="Ticket médio"          value={currency(ticket)} sub="por atendimento" accent="#0891b2" />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
+      {/* Charts: empilhados no mobile */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+        gap: 14,
+        marginBottom: 20,
+      }}>
         <Card style={{ padding: "20px 22px" }}>
           <div style={{ fontWeight: 700, fontSize: 14, color: B.text, marginBottom: 14 }}>Faturamento — últimos 6 meses</div>
           <ResponsiveContainer width="100%" height={170}>
@@ -134,14 +148,20 @@ export default function Dashboard({ appointments, clients, services, setPage }) 
                 const cl = clients.find(c => c.id === a.clientId);
                 const sv = services.find(s => s.id === a.serviceId);
                 return (
-                  <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 11, padding: "9px 12px", borderRadius: 8, background: "#fafafa", border: "1px solid #f3f4f6" }}>
+                  <div key={a.id} style={{
+                    display: "flex", alignItems: "center", gap: isMobile ? 8 : 11,
+                    padding: isMobile ? "9px 10px" : "9px 12px",
+                    borderRadius: 8, background: "#fafafa", border: "1px solid #f3f4f6",
+                  }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: B.brand, minWidth: 44 }}>{a.time}</div>
                     <Avatar name={cl?.name || "?"} size={30} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>{cl?.name}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cl?.name}</div>
                       <div style={{ fontSize: 11, color: B.muted }}>{sv?.name}</div>
                     </div>
-                    <div style={{ fontSize: 13, fontWeight: 700 }}>{sv ? currency(applyDiscount(sv.price, a.discount)) : "—"}</div>
+                    {!isMobile && (
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>{sv ? currency(applyDiscount(sv.price, a.discount)) : "—"}</div>
+                    )}
                     <StatusBadge status={a.status} />
                   </div>
                 );

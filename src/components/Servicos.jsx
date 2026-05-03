@@ -7,8 +7,10 @@ import Btn from "./ui/Btn";
 import Field from "./ui/Field";
 import TextArea from "./ui/TextArea";
 import SectionTitle from "./ui/SectionTitle";
+import { useBreakpoint } from "../hooks/useBreakpoint";
 
 export default function Servicos({ services, onAdd, onUpdate, onDelete }) {
+  const { isMobile } = useBreakpoint();
   const [modal,  setModal]  = useState(false);
   const [editId, setEditId] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -40,7 +42,12 @@ export default function Servicos({ services, onAdd, onUpdate, onDelete }) {
         <Btn onClick={openAdd}><Plus size={14} /> Novo serviço</Btn>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+      {/* Grid: 1 col no mobile, 2 no tablet, 3 no desktop */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(220px, 1fr))",
+        gap: 14,
+      }}>
         {services.map(s => (
           <Card key={s.id} style={{ padding: 20, opacity: s.active ? 1 : 0.55, transition: "opacity 0.2s" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>

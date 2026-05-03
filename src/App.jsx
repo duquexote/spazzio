@@ -7,8 +7,8 @@ import Clientes from "./components/Clientes";
 import Servicos from "./components/Servicos";
 import NovoAgendamento from "./components/NovoAgendamento";
 import { B } from "./constants/brand";
+import { useBreakpoint } from "./hooks/useBreakpoint";
 
-// ── Normaliza registro do Supabase para formato interno ──────────
 function normalizeAppointment(a) {
   return {
     id:        a.id,
@@ -24,7 +24,6 @@ function normalizeAppointment(a) {
   };
 }
 
-// ── Spinner simples ──────────────────────────────────────────────
 function Spinner() {
   return (
     <div style={{
@@ -43,13 +42,13 @@ function Spinner() {
 }
 
 export default function App() {
+  const { isMobile } = useBreakpoint();
   const [page,         setPage]         = useState("dashboard");
   const [appointments, setAppointments] = useState([]);
   const [clients,      setClients]      = useState([]);
   const [services,     setServices]     = useState([]);
   const [loading,      setLoading]      = useState(true);
 
-  // ── Carrega dados iniciais ────────────────────────────────────
   const loadAll = useCallback(async () => {
     setLoading(true);
     const [{ data: svcs }, { data: clts }, { data: apts }] = await Promise.all([
@@ -65,54 +64,46 @@ export default function App() {
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
-  // ── CLIENTS CRUD ──────────────────────────────────────────────
+  // CLIENTS
   const addClient = async (data) => {
     const { data: row } = await supabase
       .from("clients")
       .insert({ name: data.name, phone: data.phone, birthdate: data.birthdate || null, notes: data.notes || "" })
-      .select()
-      .single();
+      .select().single();
     if (row) setClients(p => [...p, row]);
     return row;
   };
-
   const updateClient = async (id, data) => {
-    await supabase
-      .from("clients")
+    await supabase.from("clients")
       .update({ name: data.name, phone: data.phone, birthdate: data.birthdate || null, notes: data.notes || "" })
       .eq("id", id);
     setClients(p => p.map(c => c.id === id ? { ...c, ...data } : c));
   };
-
   const deleteClient = async (id) => {
     await supabase.from("clients").delete().eq("id", id);
     setClients(p => p.filter(c => c.id !== id));
   };
 
-  // ── SERVICES CRUD ─────────────────────────────────────────────
+  // SERVICES
   const addService = async (data) => {
     const { data: row } = await supabase
       .from("services")
       .insert({ name: data.name, price: data.price, duration: data.duration, description: data.description || "", active: true })
-      .select()
-      .single();
+      .select().single();
     if (row) setServices(p => [...p, row]);
   };
-
   const updateService = async (id, data) => {
-    await supabase
-      .from("services")
+    await supabase.from("services")
       .update({ name: data.name, price: data.price, duration: data.duration, description: data.description || "", active: data.active })
       .eq("id", id);
     setServices(p => p.map(s => s.id === id ? { ...s, ...data } : s));
   };
-
   const deleteService = async (id) => {
     await supabase.from("services").delete().eq("id", id);
     setServices(p => p.filter(s => s.id !== id));
   };
 
-  // ── APPOINTMENTS CRUD ─────────────────────────────────────────
+  // APPOINTMENTS
   const addAppointment = async (data) => {
     const { data: row } = await supabase
       .from("appointments")
@@ -126,11 +117,9 @@ export default function App() {
         discount_type:  data.discount?.type  || null,
         discount_value: data.discount?.value || null,
       })
-      .select()
-      .single();
+      .select().single();
     if (row) setAppointments(p => [...p, normalizeAppointment(row)]);
   };
-
   const updateAppointmentStatus = async (id, status) => {
     await supabase.from("appointments").update({ status }).eq("id", id);
     setAppointments(p => p.map(a => a.id === id ? { ...a, status } : a));
@@ -138,55 +127,44 @@ export default function App() {
 
   if (loading) return <Spinner />;
 
+  const mainStyle = {
+    flex: 1,
+    marginLeft: isMobile ? 0 : 224,
+    padding: isMobile ? "72px 16px 80px" : "30px 32px",
+    overflowY: "auto",
+    minHeight: "100vh",
+    maxHeight: isMobile ? "none" : "100vh",
+  };
+
   return (
     <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", background: "#F9F7F9", minHeight: "100vh", display: "flex" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #D4A5C9; border-radius: 3px; }
+        input[type]:focus, textarea:focus { border-color: #7B1F6A !important; box-shadow: 0 0 0 3px rgba(123,31,106,0.12); }
+        button:not(:disabled):hover { filter: brightness(0.94); }
+      `}</style>
+
       <Sidebar page={page} setPage={setPage} />
 
-      <main style={{ flex: 1, marginLeft: 224, padding: "30px 32px", overflowY: "auto", minHeight: "100vh", maxHeight: "100vh" }}>
+      <main style={mainStyle}>
         {page === "dashboard" && (
-          <Dashboard
-            appointments={appointments}
-            clients={clients}
-            services={services}
-            setPage={setPage}
-          />
+          <Dashboard appointments={appointments} clients={clients} services={services} setPage={setPage} />
         )}
         {page === "agenda" && (
-          <Agenda
-            appointments={appointments}
-            onUpdateStatus={updateAppointmentStatus}
-            clients={clients}
-            services={services}
-            setPage={setPage}
-          />
+          <Agenda appointments={appointments} onUpdateStatus={updateAppointmentStatus} clients={clients} services={services} setPage={setPage} />
         )}
         {page === "clientes" && (
-          <Clientes
-            clients={clients}
-            onAdd={addClient}
-            onUpdate={updateClient}
-            onDelete={deleteClient}
-            appointments={appointments}
-            services={services}
-            setPage={setPage}
-          />
+          <Clientes clients={clients} onAdd={addClient} onUpdate={updateClient} onDelete={deleteClient} appointments={appointments} services={services} setPage={setPage} />
         )}
         {page === "servicos" && (
-          <Servicos
-            services={services}
-            onAdd={addService}
-            onUpdate={updateService}
-            onDelete={deleteService}
-          />
+          <Servicos services={services} onAdd={addService} onUpdate={updateService} onDelete={deleteService} />
         )}
         {page === "novo" && (
-          <NovoAgendamento
-            clients={clients}
-            onAddClient={addClient}
-            services={services}
-            onSubmit={addAppointment}
-            onCancel={() => setPage("agenda")}
-          />
+          <NovoAgendamento clients={clients} onAddClient={addClient} services={services} onSubmit={addAppointment} onCancel={() => setPage("agenda")} />
         )}
       </main>
     </div>
