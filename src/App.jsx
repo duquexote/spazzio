@@ -159,6 +159,60 @@ export default function App() {
     setAppointments(p => p.map(a => a.id === id ? { ...a, status } : a));
   };
 
+  const updateAppointment = async (id, data) => {
+    const payload = {
+      date:           data.date,
+      time:           data.time,
+      notes:          data.notes || "",
+      discount_type:  data.discount?.type  || null,
+      discount_value: data.discount?.value || null,
+    };
+    await supabase.from("appointments").update(payload).eq("id", id);
+    setAppointments(p => p.map(a => a.id === id ? {
+      ...a,
+      date:    data.date,
+      time:    data.time,
+      notes:   data.notes || "",
+      discount: data.discount || null,
+    } : a));
+  };
+
+  const deleteAppointment = async (id) => {
+    await supabase.from("appointments").delete().eq("id", id);
+    setAppointments(p => p.filter(a => a.id !== id));
+  };
+
+  // ── USERS (admin only) ────────────────────────────────────────
+  const updateUserProfile = async (id, data) => {
+    // Atualiza nome na tabela profiles
+    await supabase.from("profiles").update({ name: data.name, role: data.role }).eq("id", id);
+    // Se veio nova senha, usa admin API via edge function (ou auth.updateUser se for o próprio usuário)
+    if (data.newPassword) {
+      // Para o admin alterar senha de outro usuário precisamos de service_role
+      // Usamos a função edge ou, se for o próprio usuário:
+      if (id === session?.user?.id) {
+        await supabase.auth.updateUser({ password: data.newPassword });
+      }
+    }
+    setProfiles(p => p.map(u => u.id === id ? { ...u, name: data.name, role: data.role } : u));
+  };
+
+  const deleteUserProfile = async (id) => {
+    const { data, error } = await supabase.functions.invoke("delete-user", {
+      body: { userId: id },
+    });
+    if (error || data?.error) {
+      return data?.error || error?.message || "Erro ao excluir usuário";
+    }
+    setProfiles(p => p.filter(u => u.id !== id));
+    return null;
+  };
+
+  const changeMyPassword = async (newPassword) => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    return error;
+  };
+
   // ── Logout ────────────────────────────────────────────────────
   const handleLogout = () => supabase.auth.signOut();
 
@@ -203,7 +257,13 @@ export default function App() {
           <Dashboard appointments={appointments} clients={clients} services={services} setPage={setPage} profile={profile} profiles={profiles} />
         )}
         {page === "agenda" && (
-          <Agenda appointments={appointments} onUpdateStatus={updateAppointmentStatus} clients={clients} services={services} setPage={setPage} profiles={profiles} profile={profile} />
+          <Agenda
+            appointments={appointments}
+            onUpdateStatus={updateAppointmentStatus}
+            onUpdateAppointment={updateAppointment}
+            onDeleteAppointment={deleteAppointment}
+            clients={clients} services={services} setPage={setPage} profiles={profiles} profile={profile}
+          />
         )}
         {page === "clientes" && (
           <Clientes clients={clients} onAdd={addClient} onUpdate={updateClient} onDelete={deleteClient} appointments={appointments} services={services} setPage={setPage} />
@@ -212,7 +272,14 @@ export default function App() {
           <Servicos services={services} onAdd={addService} onUpdate={updateService} onDelete={deleteService} />
         )}
         {page === "usuarios" && isAdmin && (
-          <Usuarios profiles={profiles} onRefresh={loadAll} />
+          <Usuarios
+            profiles={profiles}
+            session={session}
+            onRefresh={loadAll}
+            onUpdateProfile={updateUserProfile}
+            onDeleteProfile={deleteUserProfile}
+            onChangeMyPassword={changeMyPassword}
+          />
         )}
         {page === "novo" && (
           <NovoAgendamento clients={clients} onAddClient={addClient} services={services} profiles={profiles} onSubmit={addAppointment} onCancel={() => setPage("agenda")} />

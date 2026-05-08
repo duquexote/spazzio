@@ -136,6 +136,55 @@ export default function Dashboard({ appointments, clients, services, setPage, pr
             <Stat Icon={CheckCircle}   label="Ticket médio (mês)"     value={currency(ticket)}        sub="por atendimento" accent="#16a34a" />
           </div>
 
+          {/* ── Previsão de caixa ── */}
+          {(() => {
+            const futureScheduled = appointments.filter(a => a.status === "scheduled" && a.date >= todayStr);
+            const previsao = futureScheduled.reduce((s, a) => {
+              const sv = services.find(x => x.id === a.serviceId);
+              return s + (sv ? applyDiscount(sv.price, a.discount) : 0);
+            }, 0);
+            const byDate = {};
+            futureScheduled.forEach(a => {
+              if (!byDate[a.date]) byDate[a.date] = { count: 0, total: 0 };
+              byDate[a.date].count++;
+              const sv = services.find(x => x.id === a.serviceId);
+              byDate[a.date].total += sv ? applyDiscount(sv.price, a.discount) : 0;
+            });
+            const nextDays = Object.entries(byDate).sort(([a], [b]) => a.localeCompare(b)).slice(0, 5);
+            const mo = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+            const fmtDate = d => { const [,m,dd] = d.split("-"); return `${+dd}/${mo[+m-1]}`; };
+            return (
+              <Card style={{ padding: "20px 22px", marginBottom: 20, borderTop: `3px solid #7c3aed` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: B.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Previsão de Caixa</div>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: B.text, marginTop: 4 }}>{currency(previsao)}</div>
+                    <div style={{ fontSize: 12, color: B.muted, marginTop: 1 }}>{futureScheduled.length} agendamento{futureScheduled.length !== 1 ? "s" : ""} não concluídos</div>
+                  </div>
+                  <div style={{ width: 38, height: 38, borderRadius: 10, background: "#f5f3ff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <TrendingUp size={18} color="#7c3aed" />
+                  </div>
+                </div>
+                {nextDays.length > 0 && (
+                  <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: B.muted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Próximos dias</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {nextDays.map(([d, { count, total }]) => (
+                        <div key={d} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ fontWeight: 600, color: d === todayStr ? "#7c3aed" : B.text }}>{d === todayStr ? "Hoje" : fmtDate(d)}</span>
+                            <span style={{ fontSize: 11, color: B.muted, background: "#f3f4f6", borderRadius: 10, padding: "1px 7px" }}>{count} apto{count !== 1 ? "s" : ""}</span>
+                          </div>
+                          <span style={{ fontWeight: 700, color: "#7c3aed" }}>{currency(total)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </Card>
+            );
+          })()}
+
           {/* Gráfico + top serviços */}
           <div style={{
             display: "grid",
