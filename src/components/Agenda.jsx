@@ -116,6 +116,7 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
     setEditForm({
       date:          a.date,
       time:          a.time,
+      serviceId:     a.serviceId,
       notes:         a.notes || "",
       discountOn:    !!a.discount,
       discountType:  a.discount?.type  || "percent",
@@ -132,9 +133,10 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
       ? { type: editForm.discountType, value: +editForm.discountValue }
       : null;
     await onUpdateAppointment(selA.id, {
-      date:  editForm.date,
-      time:  editForm.time,
-      notes: editForm.notes,
+      date:      editForm.date,
+      time:      editForm.time,
+      notes:     editForm.notes,
+      serviceId: editForm.serviceId,
       discount,
     });
     setSaving(false);
@@ -162,11 +164,9 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
         <div style={{ fontWeight: 700, fontSize: 14 }}>Detalhes</div>
         <div style={{ display: "flex", gap: 6 }}>
-          {isAdmin && (
-            <button onClick={() => openEdit(selA)} style={{ border: `1.5px solid ${B.border}`, borderRadius: 6, padding: "4px 7px", background: "#fff", cursor: "pointer" }}>
-              <Edit2 size={13} color={B.muted} />
-            </button>
-          )}
+          <button onClick={() => openEdit(selA)} style={{ border: `1.5px solid ${B.border}`, borderRadius: 6, padding: "4px 7px", background: "#fff", cursor: "pointer" }}>
+            <Edit2 size={13} color={B.muted} />
+          </button>
           <button onClick={() => setSel(null)} style={{ border: "none", background: "none", cursor: "pointer", padding: 2 }}>
             <X size={15} color={B.muted} />
           </button>
@@ -216,15 +216,13 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
         </div>
       )}
 
-      {isAdmin && (
-        <button onClick={() => { openEdit(selA); setConfirmDel(false); }} style={{
-          marginTop: 12, width: "100%", padding: "8px", borderRadius: 8, border: "1.5px solid #fca5a5",
-          background: "#fff0f0", color: "#dc2626", fontFamily: "inherit", fontWeight: 600,
-          fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-        }}>
-          <Edit2 size={13} /> Editar / Excluir agendamento
-        </button>
-      )}
+      <button onClick={() => { openEdit(selA); setConfirmDel(false); }} style={{
+        marginTop: 12, width: "100%", padding: "8px", borderRadius: 8, border: "1.5px solid #fca5a5",
+        background: "#fff0f0", color: "#dc2626", fontFamily: "inherit", fontWeight: 600,
+        fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+      }}>
+        <Edit2 size={13} /> Editar / Excluir agendamento
+      </button>
     </Card>
   ) : (
     <Card style={{ padding: 20, textAlign: "center" }}>
@@ -430,6 +428,21 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
 
             <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
               <Field label="Data *" type="date" value={editForm.date} onChange={v => setEditForm(f => ({ ...f, date: v }))} />
+
+              {/* Seletor de Serviço */}
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Serviço</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6 }}>
+                  {services.map(s => (
+                    <button key={s.id} onClick={() => setEditForm(f => ({ ...f, serviceId: s.id }))} style={{
+                      padding: "7px 10px", border: `1.5px solid ${editForm.serviceId === s.id ? B.brand : B.border}`,
+                      borderRadius: 8, background: editForm.serviceId === s.id ? B.light : "#fff",
+                      color: editForm.serviceId === s.id ? B.brand : B.text, cursor: "pointer",
+                      fontFamily: "inherit", fontWeight: 600, fontSize: 12, textAlign: "left",
+                    }}>{s.name}</button>
+                  ))}
+                </div>
+              </div>
 
               <div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Horário</div>

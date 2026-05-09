@@ -108,16 +108,6 @@ export default function Dashboard({ appointments, clients, services, setPage, pr
             <Stat Icon={CheckCircle}   label="Concluídos hoje"        value={todayCompleted.length}  accent="#16a34a" />
             <Stat Icon={CalendarCheck} label="Agendados hoje"         value={todayApts.length}       accent="#d97706" />
           </div>
-
-          {/* Banner informativo */}
-          <div style={{
-            background: B.light, border: `1px solid ${B.border}`, borderRadius: 10,
-            padding: "12px 16px", fontSize: 13, color: B.muted, marginBottom: 20,
-            display: "flex", alignItems: "center", gap: 8,
-          }}>
-            <span style={{ fontSize: 16 }}>ℹ️</span>
-            Você tem acesso ao faturamento do dia atual. Contate o administrador para relatórios completos.
-          </div>
         </>
       )}
 

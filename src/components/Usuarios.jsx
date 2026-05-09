@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { supabase } from "../supabase";
 import { B } from "../constants/brand";
-import { Plus, Shield, User2, X, Check, Power, Edit2, Trash2, Lock, KeyRound } from "lucide-react";
+import { Plus, Shield, User2, X, Check, Power, Edit2, Trash2, Lock, KeyRound, Eye, EyeOff } from "lucide-react";
 import Card from "./ui/Card";
 import Btn from "./ui/Btn";
 import SectionTitle from "./ui/SectionTitle";
@@ -23,6 +23,7 @@ export default function Usuarios({ profiles, session, onRefresh, onUpdateProfile
   const [createForm,  setCreateForm]  = useState({ name: "", email: "", password: "", role: "employee" });
   const [createErr,   setCreateErr]   = useState("");
   const [creating,    setCreating]    = useState(false);
+  const [showCreatePw, setShowCreatePw] = useState(false);
 
   // ── Editar usuário ────────────────────────────────────────────
   const [editTarget,  setEditTarget]  = useState(null); // profile obj
@@ -30,6 +31,7 @@ export default function Usuarios({ profiles, session, onRefresh, onUpdateProfile
   const [editErr,     setEditErr]     = useState("");
   const [saving,      setSaving]      = useState(false);
   const [confirmDel,  setConfirmDel]  = useState(false);
+  const [showEditPw,  setShowEditPw]  = useState(false);
 
   // ── Minha senha (admin) ───────────────────────────────────────
   const [pwModal,  setPwModal]  = useState(false);
@@ -157,7 +159,34 @@ export default function Usuarios({ profiles, session, onRefresh, onUpdateProfile
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <Field label="Nome completo *" value={createForm.name} onChange={v => setCreateForm(f => ({ ...f, name: v }))} placeholder="Ex: Juliana Souza" />
               <Field label="E-mail *" type="email" value={createForm.email} onChange={v => setCreateForm(f => ({ ...f, email: v }))} placeholder="julia@spazzio.com" />
-              <Field label="Senha inicial *" type="password" value={createForm.password} onChange={v => setCreateForm(f => ({ ...f, password: v }))} placeholder="Mínimo 6 caracteres" />
+              {/* Campo senha com toggle */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>Senha inicial *</label>
+                <div style={{ position: "relative" }}>
+                  <input
+                    type={showCreatePw ? "text" : "password"}
+                    value={createForm.password}
+                    onChange={e => setCreateForm(f => ({ ...f, password: e.target.value }))}
+                    placeholder="Mínimo 6 caracteres"
+                    style={{
+                      border: `1.5px solid ${B.border}`, borderRadius: 8, padding: "8px 38px 8px 11px",
+                      fontSize: 14, fontFamily: "inherit", outline: "none",
+                      color: B.text, background: "#fff", width: "100%", boxSizing: "border-box",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCreatePw(v => !v)}
+                    style={{
+                      position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+                      border: "none", background: "none", cursor: "pointer", padding: 2,
+                      display: "flex", alignItems: "center",
+                    }}
+                  >
+                    {showCreatePw ? <EyeOff size={16} color={B.muted} /> : <Eye size={16} color={B.muted} />}
+                  </button>
+                </div>
+              </div>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Tipo de acesso *</label>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -210,12 +239,30 @@ export default function Usuarios({ profiles, session, onRefresh, onUpdateProfile
                   <KeyRound size={12} style={{ marginRight: 4, verticalAlign: "middle" }} />
                   Nova senha (deixe em branco para manter)
                 </label>
-                <Field type="password" value={editForm.newPassword} onChange={v => setEditForm(f => ({ ...f, newPassword: v }))} placeholder="Nova senha (mín. 6 caracteres)" />
-                {editTarget.id !== session?.user?.id && editForm.newPassword && (
-                  <div style={{ fontSize: 11, color: "#d97706", marginTop: 4 }}>
-                    ⚠️ A troca de senha de outro usuário requer a Edge Function com service_role.
-                  </div>
-                )}
+                <div style={{ position: "relative" }}>
+                  <input
+                    type={showEditPw ? "text" : "password"}
+                    value={editForm.newPassword}
+                    onChange={e => setEditForm(f => ({ ...f, newPassword: e.target.value }))}
+                    placeholder="Nova senha (mín. 6 caracteres)"
+                    style={{
+                      border: `1.5px solid ${B.border}`, borderRadius: 8, padding: "8px 38px 8px 11px",
+                      fontSize: 14, fontFamily: "inherit", outline: "none",
+                      color: B.text, background: "#fff", width: "100%", boxSizing: "border-box",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEditPw(v => !v)}
+                    style={{
+                      position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+                      border: "none", background: "none", cursor: "pointer", padding: 2,
+                      display: "flex", alignItems: "center",
+                    }}
+                  >
+                    {showEditPw ? <EyeOff size={16} color={B.muted} /> : <Eye size={16} color={B.muted} />}
+                  </button>
+                </div>
               </div>
 
               {editErr && <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 8, padding: "9px 13px", fontSize: 13, color: "#dc2626" }}>{editErr}</div>}

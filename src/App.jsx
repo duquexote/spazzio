@@ -166,14 +166,16 @@ export default function App() {
       notes:          data.notes || "",
       discount_type:  data.discount?.type  || null,
       discount_value: data.discount?.value || null,
+      ...(data.serviceId ? { service_id: data.serviceId } : {}),
     };
     await supabase.from("appointments").update(payload).eq("id", id);
     setAppointments(p => p.map(a => a.id === id ? {
       ...a,
-      date:    data.date,
-      time:    data.time,
-      notes:   data.notes || "",
-      discount: data.discount || null,
+      date:      data.date,
+      time:      data.time,
+      notes:     data.notes || "",
+      discount:  data.discount || null,
+      ...(data.serviceId ? { serviceId: data.serviceId } : {}),
     } : a));
   };
 

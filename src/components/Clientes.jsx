@@ -13,11 +13,12 @@ import { useBreakpoint } from "../hooks/useBreakpoint";
 export default function Clientes({ clients, onAdd, onUpdate, onDelete, appointments, services, setPage }) {
   const { isMobile } = useBreakpoint();
   const [q,      setQ]      = useState("");
-  const [sel,    setSel]    = useState(null);
-  const [modal,  setModal]  = useState(false);
-  const [editId, setEditId] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [form,   setForm]   = useState({ name: "", phone: "", cpf: "", birthdate: "", notes: "" });
+  const [sel,        setSel]        = useState(null);
+  const [modal,      setModal]      = useState(false);
+  const [editId,     setEditId]     = useState(null);
+  const [saving,     setSaving]     = useState(false);
+  const [form,       setForm]       = useState({ name: "", phone: "", cpf: "", birthdate: "", notes: "" });
+  const [confirmDel, setConfirmDel] = useState(false); // id do cliente aguardando confirmação
   // No mobile, controla se estamos vendo a lista ou o perfil
   const [showProfile, setShowProfile] = useState(false);
 
@@ -40,6 +41,7 @@ export default function Clientes({ clients, onAdd, onUpdate, onDelete, appointme
   const del = async (id) => {
     await onDelete(id);
     if (sel === id) { setSel(null); setShowProfile(false); }
+    setConfirmDel(false);
   };
 
   const selectClient = (id) => {
@@ -95,7 +97,7 @@ export default function Clientes({ clients, onAdd, onUpdate, onDelete, appointme
           <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
             <Btn small variant="outline" onClick={() => openEdit(selCl)}><Edit2 size={12} /> Editar</Btn>
             <Btn small onClick={() => setPage("novo")}><Plus size={12} /> Agendar</Btn>
-            <Btn small variant="danger" onClick={() => del(selCl.id)}><Trash2 size={12} /></Btn>
+            <Btn small variant="danger" onClick={() => setConfirmDel(selCl.id)}><Trash2 size={12} /></Btn>
           </div>
         </div>
         {selCl.notes && (
@@ -278,6 +280,29 @@ export default function Clientes({ clients, onAdd, onUpdate, onDelete, appointme
           <div style={{ flex: 1, overflowY: "auto" }}>
             {profileContent}
           </div>
+        </div>
+      )}
+
+      {/* Modal confirmar exclusão */}
+      {confirmDel && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60 }}>
+          <Card style={{ padding: 28, width: 380, maxWidth: "90vw" }}>
+            <div style={{ textAlign: "center", marginBottom: 18 }}>
+              <Trash2 size={32} color="#ef4444" style={{ margin: "0 auto 10px" }} />
+              <div style={{ fontFamily: "inherit", fontSize: 18, fontWeight: 700, color: "#111" }}>Excluir cliente</div>
+              <div style={{ fontSize: 13, color: B.muted, marginTop: 6, lineHeight: 1.5 }}>
+                Você tem certeza que deseja excluir este cliente?<br />
+                <strong style={{ color: "#374151" }}>{clients.find(c => c.id === confirmDel)?.name}</strong><br />
+                Esta ação não pode ser desfeita.
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <Btn variant="ghost" onClick={() => setConfirmDel(false)} style={{ flex: 1 }}>Cancelar</Btn>
+              <Btn variant="danger" onClick={() => del(confirmDel)} style={{ flex: 1 }}>
+                <Trash2 size={13} /> Excluir
+              </Btn>
+            </div>
+          </Card>
         </div>
       )}
 
