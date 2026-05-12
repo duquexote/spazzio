@@ -11,8 +11,8 @@ import TextArea from "./ui/TextArea";
 import SectionTitle from "./ui/SectionTitle";
 import { useBreakpoint } from "../hooks/useBreakpoint";
 
-// 5 passos agora: Cliente | Serviço | Atendente | Data&Hora | Confirmar
-const STEPS = ["Cliente", "Serviço", "Atendente", "Data & Hora", "Confirmar"];
+// 5 passos: Cliente | Serviços | Atendente | Data&Hora | Confirmar
+const STEPS = ["Cliente", "Serviços", "Atendente", "Data & Hora", "Confirmar"];
 
 const slots = [];
 for (let h = 8; h < 20; h++) {
@@ -24,7 +24,9 @@ export default function NovoAgendamento({ clients, onAddClient, services, profil
   const { isMobile } = useBreakpoint();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
-    clientId:   null, serviceId: null, employeeId: null,
+    clientId:   null,
+    serviceIds: [],   // array de IDs de serviços selecionados
+    employeeId: null,
     date: todayStr, time: "",
     discountOn: false, discountType: "percent", discountValue: "",
     notes: "", addNew: false,
@@ -34,18 +36,31 @@ export default function NovoAgendamento({ clients, onAddClient, services, profil
   const [submitting, setSubmitting] = useState(false);
   const [savingCl,   setSavingCl]   = useState(false);
 
-  const cl      = clients.find(c => c.id === form.clientId);
-  const sv      = services.find(s => s.id === form.serviceId);
-  const emp     = profiles.find(p => p.id === form.employeeId);
-  const discObj = form.discountOn && form.discountValue ? { type: form.discountType, value: +form.discountValue } : null;
-  const finalP  = sv ? applyDiscount(sv.price, discObj) : 0;
+  const cl       = clients.find(c => c.id === form.clientId);
+  const selSvs   = services.filter(s => form.serviceIds.includes(s.id));
+  const totalBase = selSvs.reduce((acc, s) => acc + s.price, 0);
+  const totalDur  = selSvs.reduce((acc, s) => acc + s.duration, 0);
+  const discObj  = form.discountOn && form.discountValue ? { type: form.discountType, value: +form.discountValue } : null;
+  const finalP   = applyDiscount(totalBase, discObj);
+  const emp      = profiles.find(p => p.id === form.employeeId);
 
-  // Apenas profiles ativos para selecionar como atendente
   const activeProfiles = profiles.filter(p => p.active);
 
   const filtCl = clients.filter(c =>
     c.name.toLowerCase().includes(cSearch.toLowerCase()) || c.phone.includes(cSearch)
   );
+
+  const toggleService = (id) => {
+    setForm(f => {
+      const already = f.serviceIds.includes(id);
+      return {
+        ...f,
+        serviceIds: already
+          ? f.serviceIds.filter(s => s !== id)
+          : [...f.serviceIds, id],
+      };
+    });
+  };
 
   const addNewClient = async () => {
     if (!form.newName || !form.newPhone) return;
@@ -58,7 +73,9 @@ export default function NovoAgendamento({ clients, onAddClient, services, profil
   const submit = async () => {
     setSubmitting(true);
     await onSubmit({
-      clientId: form.clientId, serviceId: form.serviceId,
+      clientId:   form.clientId,
+      serviceIds: form.serviceIds,
+      serviceId:  form.serviceIds[0] || null, // compatibilidade legado
       employeeId: form.employeeId,
       date: form.date, time: form.time,
       discount: discObj, notes: form.notes,
@@ -67,9 +84,8 @@ export default function NovoAgendamento({ clients, onAddClient, services, profil
     onCancel();
   };
 
-  // canNext por passo (1-indexed): [step1_ok, step2_ok, step3_ok, step4_ok]
-  // Atendente (step 3) é opcional — pode pular
-  const canNext = [form.clientId, form.serviceId, true, form.date && form.time, true];
+  // canNext por passo (1-indexed)
+  const canNext = [form.clientId, form.serviceIds.length > 0, true, form.date && form.time, true];
 
   const slotCols = isMobile ? 4 : 6;
 
@@ -163,32 +179,72 @@ export default function NovoAgendamento({ clients, onAddClient, services, profil
           </div>
         )}
 
-        {/* ── Step 2: Serviço ── */}
+        {/* ── Step 2: Serviços (múltipla seleção) ── */}
         {step === 2 && (
           <div>
-            <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Serviço e desconto</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
-              {services.filter(s => s.active).map(s => (
-                <div key={s.id} onClick={() => setForm(f => ({ ...f, serviceId: s.id }))} style={{
-                  display: "flex", justifyContent: "space-between", alignItems: "center",
-                  padding: "11px 15px", border: `1.5px solid ${form.serviceId === s.id ? B.brand : B.border}`,
-                  borderRadius: 9, cursor: "pointer",
-                  background: form.serviceId === s.id ? B.light : "#fff", transition: "all 0.15s",
-                }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 14 }}>{s.name}</div>
-                    <div style={{ fontSize: 11, color: B.muted, display: "flex", alignItems: "center", gap: 3, marginTop: 1 }}><Clock size={10} /> {s.duration} min</div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                    <div style={{ fontSize: 19, fontWeight: 700, color: B.brand }}>{currency(s.price)}</div>
-                    {form.serviceId === s.id && <Check size={15} color={B.brand} />}
-                  </div>
-                </div>
-              ))}
+            <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>Selecionar serviços</div>
+            <div style={{ fontSize: 13, color: B.muted, marginBottom: 16 }}>
+              Selecione um ou mais serviços para este atendimento
             </div>
 
-            {form.serviceId && (
-              <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: 16 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+              {services.filter(s => s.active).map(s => {
+                const selected = form.serviceIds.includes(s.id);
+                return (
+                  <div key={s.id} onClick={() => toggleService(s.id)} style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "11px 15px", border: `1.5px solid ${selected ? B.brand : B.border}`,
+                    borderRadius: 9, cursor: "pointer",
+                    background: selected ? B.light : "#fff", transition: "all 0.15s",
+                  }}>
+                    {/* Checkbox visual */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
+                      <div style={{
+                        width: 20, height: 20, borderRadius: 6, border: `2px solid ${selected ? B.brand : B.border}`,
+                        background: selected ? B.brand : "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+                        flexShrink: 0, transition: "all 0.15s",
+                      }}>
+                        {selected && <Check size={12} color="#fff" strokeWidth={3} />}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>{s.name}</div>
+                        <div style={{ fontSize: 11, color: B.muted, display: "flex", alignItems: "center", gap: 3, marginTop: 1 }}>
+                          <Clock size={10} /> {s.duration} min
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 19, fontWeight: 700, color: B.brand, flexShrink: 0 }}>
+                      {currency(s.price)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Resumo dos serviços selecionados */}
+            {form.serviceIds.length > 0 && (
+              <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: 14 }}>
+                <div style={{ background: B.light, borderRadius: 9, padding: "12px 15px", marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: B.muted, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    {form.serviceIds.length} serviço{form.serviceIds.length > 1 ? "s" : ""} selecionado{form.serviceIds.length > 1 ? "s" : ""}
+                  </div>
+                  {selSvs.map(s => (
+                    <div key={s.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "3px 0" }}>
+                      <span style={{ color: B.text }}>{s.name}</span>
+                      <span style={{ fontWeight: 600, color: B.brand }}>{currency(s.price)}</span>
+                    </div>
+                  ))}
+                  <div style={{ borderTop: `1px solid ${B.border}`, marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: 13, color: B.muted }}>Duração total</span>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{totalDur} min</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700 }}>Total</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: B.brand }}>{currency(totalBase)}</span>
+                  </div>
+                </div>
+
+                {/* Desconto */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                   <div style={{ fontWeight: 600, fontSize: 14, display: "flex", alignItems: "center", gap: 6 }}>
                     <Tag size={14} color={B.brand} /> Aplicar desconto
@@ -219,11 +275,11 @@ export default function NovoAgendamento({ clients, onAddClient, services, profil
                       onChange={v => setForm(f => ({ ...f, discountValue: v }))}
                       placeholder={form.discountType === "percent" ? "Ex: 10" : "Ex: 20"}
                     />
-                    {form.discountValue && sv && (
+                    {form.discountValue && (
                       <div style={{ marginTop: 10, background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, padding: "10px 13px" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: B.muted }}>
                           <span>Valor original</span>
-                          <span style={{ textDecoration: "line-through" }}>{currency(sv.price)}</span>
+                          <span style={{ textDecoration: "line-through" }}>{currency(totalBase)}</span>
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 15, color: "#16a34a", marginTop: 5 }}>
                           <span>Valor final</span><span>{currency(finalP)}</span>
@@ -313,13 +369,23 @@ export default function NovoAgendamento({ clients, onAddClient, services, profil
                   <div style={{ fontSize: 12, color: B.muted }}>{cl?.phone}</div>
                 </div>
               </div>
+
+              {/* Serviços selecionados */}
+              <div style={{ marginBottom: 8, paddingBottom: 8, borderBottom: `1px solid ${B.border}` }}>
+                <div style={{ fontSize: 12, color: B.muted, marginBottom: 6 }}>Serviço{selSvs.length > 1 ? "s" : ""}</div>
+                {selSvs.map(s => (
+                  <div key={s.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "2px 0" }}>
+                    <span style={{ fontWeight: 600 }}>{s.name}</span>
+                    <span style={{ color: B.brand, fontWeight: 600 }}>{currency(s.price)}</span>
+                  </div>
+                ))}
+              </div>
+
               {[
-                ["Serviço",    sv?.name],
                 ["Data",       ptFull(form.date)],
                 ["Horário",    form.time],
-                ["Duração",    `${sv?.duration} min`],
+                ["Duração total", `${totalDur} min`],
                 ["Atendente",  emp ? emp.name : "Não definido"],
-                ["Valor",      sv ? currency(sv.price) : "—"],
                 ...(discObj ? [["Desconto", discObj.type === "percent" ? `${discObj.value}%` : currency(discObj.value)]] : []),
                 ["Total",      currency(finalP)],
               ].map(([k, v]) => (

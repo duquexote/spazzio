@@ -26,14 +26,20 @@ function toMin(time) {
   return h * 60 + m;
 }
 
+// Calcula duração total de um agendamento (soma de múltiplos serviços)
+function aptDuration(a, services) {
+  if (a.serviceIds && a.serviceIds.length > 0) {
+    return a.serviceIds.reduce((acc, sid) => acc + (services.find(s => s.id === sid)?.duration || 0), 0) || 60;
+  }
+  return services.find(s => s.id === a.serviceId)?.duration || 60;
+}
+
 // Detecta sobreposição real entre dois agendamentos (considera duração)
 function overlaps(a, b, services) {
   const aStart = toMin(a.time);
-  const aDur   = services.find(s => s.id === a.serviceId)?.duration || 60;
-  const aEnd   = aStart + aDur;
+  const aEnd   = aStart + aptDuration(a, services);
   const bStart = toMin(b.time);
-  const bDur   = services.find(s => s.id === b.serviceId)?.duration || 60;
-  const bEnd   = bStart + bDur;
+  const bEnd   = bStart + aptDuration(b, services);
   return aStart < bEnd && bStart < aEnd;
 }
 
@@ -45,9 +51,7 @@ function buildColumns(apts, services) {
   const sorted = [...apts].sort((a, b) => {
     const diff = toMin(a.time) - toMin(b.time);
     if (diff !== 0) return diff;
-    const aDur = services.find(s => s.id === a.serviceId)?.duration || 60;
-    const bDur = services.find(s => s.id === b.serviceId)?.duration || 60;
-    return bDur - aDur; // maior duração primeiro
+    return aptDuration(b, services) - aptDuration(a, services);
   });
 
   // cols[i] = minuto em que a coluna i fica livre
@@ -56,10 +60,10 @@ function buildColumns(apts, services) {
 
   sorted.forEach(a => {
     const start = toMin(a.time);
+    const dur   = aptDuration(a, services);
     let placed = false;
     for (let c = 0; c < cols.length; c++) {
       if (cols[c] <= start) {
-        const dur = services.find(s => s.id === a.serviceId)?.duration || 60;
         cols[c] = start + dur;
         colOf[a.id] = c;
         placed = true;
@@ -67,7 +71,6 @@ function buildColumns(apts, services) {
       }
     }
     if (!placed) {
-      const dur = services.find(s => s.id === a.serviceId)?.duration || 60;
       cols.push(start + dur);
       colOf[a.id] = cols.length - 1;
     }
@@ -117,6 +120,7 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
       date:          a.date,
       time:          a.time,
       serviceId:     a.serviceId,
+      serviceIds:    a.serviceIds?.length > 0 ? a.serviceIds : (a.serviceId ? [a.serviceId] : []),
       notes:         a.notes || "",
       discountOn:    !!a.discount,
       discountType:  a.discount?.type  || "percent",
@@ -133,10 +137,11 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
       ? { type: editForm.discountType, value: +editForm.discountValue }
       : null;
     await onUpdateAppointment(selA.id, {
-      date:      editForm.date,
-      time:      editForm.time,
-      notes:     editForm.notes,
-      serviceId: editForm.serviceId,
+      date:       editForm.date,
+      time:       editForm.time,
+      notes:      editForm.notes,
+      serviceId:  editForm.serviceIds[0] || editForm.serviceId,
+      serviceIds: editForm.serviceIds,
       discount,
     });
     setSaving(false);
@@ -153,10 +158,18 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
     setSel(null);
   };
 
-  const selA  = sel ? appointments.find(a => a.id === sel) : null;
-  const selCl = selA ? clients.find(c => c.id === selA.clientId) : null;
-  const selSv = selA ? services.find(s => s.id === selA.serviceId) : null;
+  const selA   = sel ? appointments.find(a => a.id === sel) : null;
+  const selCl  = selA ? clients.find(c => c.id === selA.clientId) : null;
+  // Suporte a múltiplos serviços
+  const selSvs = selA
+    ? (selA.serviceIds?.length > 0
+        ? selA.serviceIds.map(sid => services.find(s => s.id === sid)).filter(Boolean)
+        : services.filter(s => s.id === selA.serviceId))
+    : [];
+  const selSv  = selSvs[0] || null; // compatibilidade
   const selEmp = selA?.employeeId ? profiles.find(p => p.id === selA.employeeId) : null;
+  const selTotalPrice = selSvs.reduce((acc, s) => acc + s.price, 0);
+  const selTotalDur   = selSvs.reduce((acc, s) => acc + s.duration, 0);
 
   // ── Painel de detalhes ───────────────────────────────────────
   const detailPanel = selA && selCl && selSv ? (
@@ -180,14 +193,23 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
         </div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 14, paddingBottom: 14, borderBottom: "1px solid #f3f4f6" }}>
+        {/* Serviços (múltiplos) */}
+        <div style={{ fontSize: 13 }}>
+          <span style={{ color: B.muted }}>Serviço{selSvs.length > 1 ? "s" : ""}</span>
+          {selSvs.map(s => (
+            <div key={s.id} style={{ display: "flex", justifyContent: "space-between", marginTop: 3 }}>
+              <span style={{ fontWeight: 500 }}>{s.name}</span>
+              {isAdmin && <span style={{ color: B.brand, fontWeight: 600 }}>{currency(s.price)}</span>}
+            </div>
+          ))}
+        </div>
         {[
-          ["Serviço",   selSv.name],
           ["Data",      ptFull(selA.date)],
           ["Horário",   selA.time],
-          ["Duração",   `${selSv.duration} min`],
+          ["Duração total", `${selTotalDur} min`],
           ["Atendente", selEmp ? selEmp.name : "—"],
           ...(isAdmin && selA.discount ? [["Desconto", selA.discount.type === "percent" ? `${selA.discount.value}%` : currency(selA.discount.value)]] : []),
-          ...(isAdmin ? [["Total", currency(applyDiscount(selSv.price, selA.discount))]] : []),
+          ...(isAdmin ? [["Total", currency(applyDiscount(selTotalPrice, selA.discount))]] : []),
         ].map(([k, v]) => (
           <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
             <span style={{ color: B.muted }}>{k}</span>
@@ -243,8 +265,11 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
         ["Concluídos",   dayApts.filter(a => a.status === "completed").length],
         ["Pendentes",    dayApts.filter(a => a.status === "scheduled").length],
         ...(isAdmin ? [["Faturamento", currency(dayApts.filter(a => a.status === "completed").reduce((s, a) => {
-          const sv = services.find(x => x.id === a.serviceId);
-          return s + (sv ? applyDiscount(sv.price, a.discount) : 0);
+          const svList = a.serviceIds?.length > 0
+            ? a.serviceIds.map(sid => services.find(x => x.id === sid)).filter(Boolean)
+            : services.filter(x => x.id === a.serviceId);
+          const total = svList.reduce((t, sv) => t + sv.price, 0);
+          return s + applyDiscount(total, a.discount);
         }, 0))]] : []),
       ].map(([k, v]) => (
         <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "4px 0", borderBottom: "1px solid #f9fafb" }}>
@@ -287,18 +312,18 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
               curtos fiquem SEMPRE visíveis em cima de procedimentos longos */}
           {[...dayApts]
             .sort((a, b) => {
-              // Selecionado sempre por último (z-index máximo)
               if (a.id === sel) return 1;
               if (b.id === sel) return -1;
-              const aDur = services.find(s => s.id === a.serviceId)?.duration || 60;
-              const bDur = services.find(s => s.id === b.serviceId)?.duration || 60;
-              return bDur - aDur; // maior duração renderiza primeiro = z-index menor
+              return aptDuration(b, services) - aptDuration(a, services);
             })
             .map((a, renderIdx) => {
-            const sv     = services.find(s => s.id === a.serviceId);
+            const svList = a.serviceIds?.length > 0
+              ? a.serviceIds.map(sid => services.find(s => s.id === sid)).filter(Boolean)
+              : services.filter(s => s.id === a.serviceId);
+            const sv     = svList[0] || null;
             const cl     = clients.find(c => c.id === a.clientId);
             const emp    = a.employeeId ? profiles.find(p => p.id === a.employeeId) : null;
-            const dur    = sv?.duration || 60;
+            const dur    = aptDuration(a, services);
             const top    = t2px(a.time);
             const hpx    = Math.max(dur * (HOUR_H / 60) - 4, 30);
             const done   = a.status === "completed";
@@ -367,16 +392,14 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
                         · {emp.name.split(" ")[0]}
                       </span>
                     )}
-                    {sv?.name && (
-                      <span style={{ fontSize: 10, fontWeight: 600, color: col, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "30%", flexShrink: 0 }}>
-                        {sv.name}
-                      </span>
-                    )}
-                    {isAdmin && sv && (
+                    <span style={{ fontSize: 10, fontWeight: 600, color: col, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "35%", flexShrink: 0 }}>
+                      {svList.map(s => s.name).join("+")}
+                    </span>
+                    {isAdmin && (() => { const tot = svList.reduce((t,s)=>t+s.price,0); return (
                       <span style={{ fontSize: 10, fontWeight: 700, color: col, flexShrink: 0 }}>
-                        {currency(applyDiscount(sv.price, a.discount))}
+                        {currency(applyDiscount(tot, a.discount))}
                       </span>
-                    )}
+                    ); })()}
                   </>
                 ) : (
                   /* ── Layout normal (60min+) ───────────────────────── */
@@ -387,20 +410,15 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
                     <div style={{ fontSize: 12, fontWeight: 600, color: B.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.3 }}>
                       {cl?.name}
                     </div>
-                    {/* Serviço + atendente na mesma linha */}
+                    {/* Serviços + atendente */}
                     <div style={{ fontSize: 10, fontWeight: 600, color: col, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.2, opacity: 0.8 }}>
-                      {sv?.name}{emp ? ` · ${emp.name.split(" ")[0]}` : ""}
+                      {svList.map(s => s.name).join(" + ")}{emp ? ` · ${emp.name.split(" ")[0]}` : ""}
                     </div>
-                    {!isMedium && isAdmin && sv && (
-                      <div style={{ fontSize: 11, fontWeight: 700, color: col, marginTop: "auto" }}>
-                        {currency(applyDiscount(sv.price, a.discount))}
+                    {isAdmin && (() => { const tot = svList.reduce((t,s)=>t+s.price,0); return (
+                      <div style={{ fontSize: isMedium ? 10 : 11, fontWeight: 700, color: col, marginTop: isMedium ? 0 : "auto" }}>
+                        {currency(applyDiscount(tot, a.discount))}
                       </div>
-                    )}
-                    {isMedium && isAdmin && sv && (
-                      <div style={{ fontSize: 10, fontWeight: 700, color: col }}>
-                        {currency(applyDiscount(sv.price, a.discount))}
-                      </div>
-                    )}
+                    ); })()}
                   </>
                 )}
               </div>
@@ -429,18 +447,30 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
             <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
               <Field label="Data *" type="date" value={editForm.date} onChange={v => setEditForm(f => ({ ...f, date: v }))} />
 
-              {/* Seletor de Serviço */}
+              {/* Seletor de Serviços (múltipla seleção) */}
               <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Serviço</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6 }}>
-                  {services.map(s => (
-                    <button key={s.id} onClick={() => setEditForm(f => ({ ...f, serviceId: s.id }))} style={{
-                      padding: "7px 10px", border: `1.5px solid ${editForm.serviceId === s.id ? B.brand : B.border}`,
-                      borderRadius: 8, background: editForm.serviceId === s.id ? B.light : "#fff",
-                      color: editForm.serviceId === s.id ? B.brand : B.text, cursor: "pointer",
-                      fontFamily: "inherit", fontWeight: 600, fontSize: 12, textAlign: "left",
-                    }}>{s.name}</button>
-                  ))}
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Serviços</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {services.map(s => {
+                    const sel2 = (editForm.serviceIds || []).includes(s.id);
+                    return (
+                      <button key={s.id} onClick={() => setEditForm(f => {
+                        const ids = f.serviceIds || [];
+                        return { ...f, serviceIds: sel2 ? ids.filter(x => x !== s.id) : [...ids, s.id], serviceId: sel2 ? ids.filter(x => x !== s.id)[0] || null : s.id };
+                      })} style={{
+                        display: "flex", alignItems: "center", gap: 8,
+                        padding: "7px 10px", border: `1.5px solid ${sel2 ? B.brand : B.border}`,
+                        borderRadius: 8, background: sel2 ? B.light : "#fff",
+                        cursor: "pointer", fontFamily: "inherit", fontWeight: 600, fontSize: 12, textAlign: "left",
+                      }}>
+                        <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${sel2 ? B.brand : B.border}`, background: sel2 ? B.brand : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          {sel2 && <Check size={10} color="#fff" strokeWidth={3} />}
+                        </div>
+                        <span style={{ flex: 1, color: sel2 ? B.brand : B.text }}>{s.name}</span>
+                        <span style={{ color: B.muted, fontSize: 11 }}>{currency(s.price)}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

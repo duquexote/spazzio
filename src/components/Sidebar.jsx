@@ -1,16 +1,17 @@
-import { LayoutDashboard, Calendar, Users, Scissors, Plus, Shield, LogOut } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Scissors, Plus, Shield, LogOut, BadgeDollarSign } from "lucide-react";
 import { B } from "../constants/brand";
 import { useBreakpoint } from "../hooks/useBreakpoint";
 
 const NAV_BASE = [
-  { id: "dashboard", label: "Dashboard",  Icon: LayoutDashboard },
-  { id: "agenda",    label: "Agenda",     Icon: Calendar },
-  { id: "clientes",  label: "Clientes",   Icon: Users },
-  { id: "servicos",  label: "Serviços",   Icon: Scissors },
+  { id: "dashboard",  label: "Dashboard",   Icon: LayoutDashboard },
+  { id: "agenda",     label: "Agenda",      Icon: Calendar },
+  { id: "clientes",   label: "Clientes",    Icon: Users },
+  { id: "servicos",   label: "Serviços",    Icon: Scissors },
+  { id: "comissoes",  label: "Comissões",   Icon: BadgeDollarSign },
 ];
 
 const NAV_ADMIN = [
-  { id: "usuarios",  label: "Usuários",   Icon: Shield },
+  { id: "usuarios",   label: "Usuários",    Icon: Shield },
 ];
 
 export default function Sidebar({ page, setPage, profile, onLogout }) {

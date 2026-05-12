@@ -7,15 +7,20 @@ import Clientes from "./components/Clientes";
 import Servicos from "./components/Servicos";
 import NovoAgendamento from "./components/NovoAgendamento";
 import Usuarios from "./components/Usuarios";
+import Comissoes from "./components/Comissoes";
 import Login from "./components/Login";
 import { B } from "./constants/brand";
 import { useBreakpoint } from "./hooks/useBreakpoint";
 
-function normalizeAppointment(a) {
+function normalizeAppointment(a, serviceIds = null) {
+  // serviceIds vem do join com appointment_services
+  // se não fornecido, usa o service_id legado
+  const ids = serviceIds ?? (a.service_id ? [a.service_id] : []);
   return {
     id:         a.id,
     clientId:   a.client_id,
-    serviceId:  a.service_id,
+    serviceId:  ids[0] || a.service_id || null, // compatibilidade
+    serviceIds: ids,                             // múltiplos serviços
     employeeId: a.employee_id || null,
     date:       a.date,
     time:       a.time,
@@ -80,15 +85,22 @@ export default function App() {
   // ── Carregar todos os dados ───────────────────────────────────
   const loadAll = useCallback(async () => {
     setLoading(true);
-    const [{ data: svcs }, { data: clts }, { data: apts }, { data: profs }] = await Promise.all([
+    const [{ data: svcs }, { data: clts }, { data: apts }, { data: profs }, { data: aptSvcs }] = await Promise.all([
       supabase.from("services").select("*").order("name"),
       supabase.from("clients").select("*").order("name"),
       supabase.from("appointments").select("*").order("date").order("time"),
       supabase.from("profiles").select("*").order("name"),
+      supabase.from("appointment_services").select("appointment_id, service_id"),
     ]);
     setServices(svcs || []);
     setClients(clts || []);
-    setAppointments((apts || []).map(normalizeAppointment));
+    // Mapeia: appointmentId → [serviceId, ...]
+    const svcMap = {};
+    (aptSvcs || []).forEach(({ appointment_id, service_id }) => {
+      if (!svcMap[appointment_id]) svcMap[appointment_id] = [];
+      svcMap[appointment_id].push(service_id);
+    });
+    setAppointments((apts || []).map(a => normalizeAppointment(a, svcMap[a.id] || null)));
     setProfiles(profs || []);
     setLoading(false);
   }, []);
@@ -138,11 +150,15 @@ export default function App() {
 
   // ── APPOINTMENTS ──────────────────────────────────────────────
   const addAppointment = async (data) => {
+    // serviceIds é array; serviceId é o primeiro (para campo legado)
+    const serviceIds = data.serviceIds || (data.serviceId ? [data.serviceId] : []);
+    const firstServiceId = serviceIds[0] || null;
+
     const { data: row } = await supabase
       .from("appointments")
       .insert({
         client_id:      data.clientId,
-        service_id:     data.serviceId,
+        service_id:     firstServiceId,
         employee_id:    data.employeeId || null,
         date:           data.date,
         time:           data.time,
@@ -152,7 +168,15 @@ export default function App() {
         discount_value: data.discount?.value || null,
       })
       .select().single();
-    if (row) setAppointments(p => [...p, normalizeAppointment(row)]);
+
+    if (row && serviceIds.length > 0) {
+      // Inserir todos os serviços na tabela de relação
+      await supabase.from("appointment_services").insert(
+        serviceIds.map(sid => ({ appointment_id: row.id, service_id: sid }))
+      );
+    }
+
+    if (row) setAppointments(p => [...p, normalizeAppointment(row, serviceIds)]);
   };
   const updateAppointmentStatus = async (id, status) => {
     await supabase.from("appointments").update({ status }).eq("id", id);
@@ -160,22 +184,34 @@ export default function App() {
   };
 
   const updateAppointment = async (id, data) => {
+    const serviceIds = data.serviceIds || (data.serviceId ? [data.serviceId] : null);
+    const firstServiceId = serviceIds?.[0] || null;
+
     const payload = {
       date:           data.date,
       time:           data.time,
       notes:          data.notes || "",
       discount_type:  data.discount?.type  || null,
       discount_value: data.discount?.value || null,
-      ...(data.serviceId ? { service_id: data.serviceId } : {}),
+      ...(firstServiceId ? { service_id: firstServiceId } : {}),
     };
     await supabase.from("appointments").update(payload).eq("id", id);
+
+    // Atualiza tabela de relação se vieram serviceIds
+    if (serviceIds && serviceIds.length > 0) {
+      await supabase.from("appointment_services").delete().eq("appointment_id", id);
+      await supabase.from("appointment_services").insert(
+        serviceIds.map(sid => ({ appointment_id: id, service_id: sid }))
+      );
+    }
+
     setAppointments(p => p.map(a => a.id === id ? {
       ...a,
       date:      data.date,
       time:      data.time,
       notes:     data.notes || "",
       discount:  data.discount || null,
-      ...(data.serviceId ? { serviceId: data.serviceId } : {}),
+      ...(serviceIds ? { serviceId: serviceIds[0] || a.serviceId, serviceIds } : {}),
     } : a));
   };
 
@@ -285,6 +321,14 @@ export default function App() {
         )}
         {page === "novo" && (
           <NovoAgendamento clients={clients} onAddClient={addClient} services={services} profiles={profiles} onSubmit={addAppointment} onCancel={() => setPage("agenda")} />
+        )}
+        {page === "comissoes" && (
+          <Comissoes
+            profile={profile}
+            profiles={profiles}
+            appointments={appointments}
+            services={services}
+          />
         )}
       </main>
     </div>
