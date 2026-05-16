@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Calendar, ChevronLeft, ChevronRight, Phone, Check, X, Plus, UserX, Edit2, Trash2 } from "lucide-react";
 import { B } from "../constants/brand";
 import { todayStr } from "../constants/data";
@@ -109,6 +109,7 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
   const [saving,     setSaving]   = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const [payModal,   setPayModal]   = useState(false);
+  const dateInputRef = useRef(null);
 
   // Manicure vê apenas seus próprios agendamentos na agenda
   const dayApts = appointments
@@ -307,6 +308,23 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
         <button onClick={() => setDate(addDays(date, 1))} style={{ border: `1.5px solid ${B.border}`, borderRadius: 8, padding: "6px 9px", background: "#fff", cursor: "pointer" }}>
           <ChevronRight size={15} color={B.brand} />
         </button>
+        {/* Seletor de data direto */}
+        <div style={{ position: "relative" }}>
+          <button
+            onClick={() => dateInputRef.current?.showPicker()}
+            title="Ir para data"
+            style={{ border: `1.5px solid ${B.border}`, borderRadius: 8, padding: "6px 9px", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center" }}
+          >
+            <Calendar size={15} color={B.brand} />
+          </button>
+          <input
+            ref={dateInputRef}
+            type="date"
+            value={date}
+            onChange={e => e.target.value && setDate(e.target.value)}
+            style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 0, height: 0, top: 0, left: 0 }}
+          />
+        </div>
         <Btn small variant="outline" onClick={() => setDate(todayStr)}>Hoje</Btn>
       </div>
 
@@ -355,9 +373,10 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
             const colWidthPx = `calc((100% - ${LEFT_OFFSET + RIGHT_PAD + totalGap}px) / ${colTotal})`;
             const colLeftPx  = `calc(${LEFT_OFFSET}px + (${colWidthPx} + ${gapW}px) * ${colIdx})`;
 
-            // hpx para 30min ≈ 30px, 60min ≈ 64px, 90min ≈ 98px
-            const isCompact = hpx <= 36;  // 30min
-            const isMedium  = hpx <= 68;  // 60min
+            // hpx: 30min≈30px, 45min≈47px, 60min≈64px, 90min≈98px
+            const isCompact = hpx <= 36;  // 30min → 1 linha
+            const isMini    = hpx <= 54;  // 45min → 2 linhas condensadas
+            const isMedium  = hpx <= 68;  // 60min → 3 linhas
 
             return (
               <div
@@ -387,12 +406,12 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
                   flexDirection: isCompact ? "row" : "column",
                   alignItems: isCompact ? "center" : "flex-start",
                   justifyContent: "flex-start",
-                  gap: isCompact ? 5 : 1,
+                  gap: isCompact ? 5 : isMini ? 2 : 1,
                   transition: "box-shadow 0.15s, border-color 0.15s",
                 }}
               >
                 {isCompact ? (
-                  /* ── Layout compacto (30min): 1 linha com tudo ───── */
+                  /* ── 30min: 1 linha ──────────────────────────────── */
                   <>
                     <span style={{ fontSize: 10, fontWeight: 700, color: col, flexShrink: 0 }}>
                       {a.time}
@@ -414,8 +433,26 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
                       </span>
                     ); })()}
                   </>
+                ) : isMini ? (
+                  /* ── 45min: 2 linhas condensadas ─────────────────── */
+                  <>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, width: "100%", overflow: "hidden" }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: col, flexShrink: 0 }}>{a.time} · {dur}min</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: B.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cl?.name}</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, width: "100%", overflow: "hidden" }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: col, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, opacity: 0.85 }}>
+                        {svList.map(s => s.name).join("+")}
+                      </span>
+                      {canSeeFaturamento && (() => { const tot = svList.reduce((t,s)=>t+s.price,0); return (
+                        <span style={{ fontSize: 10, fontWeight: 700, color: col, flexShrink: 0 }}>
+                          {currency(applyDiscount(tot, a.discount))}
+                        </span>
+                      ); })()}
+                    </div>
+                  </>
                 ) : (
-                  /* ── Layout normal (60min+) ───────────────────────── */
+                  /* ── 60min+: layout completo ─────────────────────── */
                   <>
                     <div style={{ fontSize: 10, fontWeight: 700, color: col, lineHeight: 1.2 }}>
                       {a.time} · {dur}min
@@ -423,7 +460,6 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
                     <div style={{ fontSize: 12, fontWeight: 600, color: B.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.3 }}>
                       {cl?.name}
                     </div>
-                    {/* Serviços + atendente */}
                     <div style={{ fontSize: 10, fontWeight: 600, color: col, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.2, opacity: 0.8 }}>
                       {svList.map(s => s.name).join(" + ")}{emp ? ` · ${emp.name.split(" ")[0]}` : ""}
                     </div>
