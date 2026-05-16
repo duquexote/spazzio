@@ -11,7 +11,7 @@ import SectionTitle from "./ui/SectionTitle";
 import StatusBadge from "./ui/StatusBadge";
 import { useBreakpoint } from "../hooks/useBreakpoint";
 
-const COMMISSION_RATE = 0.5; // 50%
+const COMMISSION_RATE = 0.55; // 55%
 
 // Retorna o valor bruto (com desconto) de um agendamento somando todos os serviços
 function aptTotal(a, services) {
@@ -98,7 +98,7 @@ function EmployeeCommissionCard({ emp, apts, services, expanded, onToggle }) {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: `2px solid ${B.border}` }}>
-                    {["Data", "Horário", "Serviço", "Valor", "50%"].map((h) => (
+                    {["Data", "Horário", "Serviço", "Valor", "55%"].map((h) => (
                       <th key={h} style={{
                         textAlign: "left", padding: "6px 8px",
                         fontSize: 10, fontWeight: 700, color: B.muted,
@@ -148,7 +148,7 @@ function EmployeeCommissionCard({ emp, apts, services, expanded, onToggle }) {
 }
 
 // ── Visão do funcionário: somente seus próprios dados ─────────────────────
-function MyCommission({ profile, apts, services, year, month }) {
+function MyCommission({ profile, apts, services, clients, year, month }) {
   const { isMobile } = useBreakpoint();
   const myApts = apts.filter(
     (a) => a.employeeId === profile.id && a.status === "completed"
@@ -195,7 +195,7 @@ function MyCommission({ profile, apts, services, year, month }) {
             color: "#0891b2",
           },
           {
-            label: "A receber (50%)",
+            label: "A receber (55%)",
             value: currency(commission),
             icon: <DollarSign size={18} color="#16a34a" />,
             color: "#16a34a",
@@ -261,7 +261,7 @@ function MyCommission({ profile, apts, services, year, month }) {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: `2px solid ${B.border}` }}>
-                  {["Data", "Horário", "Serviço", "Valor", "Comissão"].map((h) => (
+                  {["Data", "Horário", "Cliente", "Serviço", "Valor", "Comissão"].map((h) => (
                     <th key={h} style={{
                       textAlign: "left", padding: "6px 8px",
                       fontSize: 10, fontWeight: 700, color: B.muted,
@@ -279,6 +279,7 @@ function MyCommission({ profile, apts, services, year, month }) {
                       <tr key={a.id} style={{ borderBottom: "1px solid #fafafa" }}>
                         <td style={{ padding: "8px 8px", color: B.muted }}>{ptShort(a.date)}</td>
                         <td style={{ padding: "8px 8px", fontWeight: 600, color: B.brand }}>{a.time}</td>
+                        <td style={{ padding: "8px 8px", fontWeight: 500 }}>{clients.find(c => c.id === a.clientId)?.name || "—"}</td>
                         <td style={{ padding: "8px 8px" }}>{aptServiceNames(a, services)}</td>
                         <td style={{ padding: "8px 8px" }}>{currency(valor)}</td>
                         <td style={{ padding: "8px 8px", fontWeight: 700, color: "#16a34a" }}>
@@ -290,7 +291,7 @@ function MyCommission({ profile, apts, services, year, month }) {
               </tbody>
               <tfoot>
                 <tr style={{ borderTop: `2px solid ${B.border}` }}>
-                  <td colSpan={3} style={{ padding: "8px 8px", fontWeight: 700 }}>Total</td>
+                  <td colSpan={4} style={{ padding: "8px 8px", fontWeight: 700 }}>Total</td>
                   <td style={{ padding: "8px 8px", fontWeight: 700, color: B.brand }}>{currency(totalProduced)}</td>
                   <td style={{ padding: "8px 8px", fontWeight: 800, color: "#16a34a", fontSize: 14 }}>{currency(commission)}</td>
                 </tr>
@@ -304,7 +305,7 @@ function MyCommission({ profile, apts, services, year, month }) {
 }
 
 // ── Componente principal ───────────────────────────────────────────────────
-export default function Comissoes({ profile, profiles, appointments, services }) {
+export default function Comissoes({ profile, profiles, appointments, services, clients }) {
   const isAdmin = profile?.role === "admin";
   const now = new Date();
   const [year,  setYear]  = useState(now.getFullYear());
@@ -325,8 +326,8 @@ export default function Comissoes({ profile, profiles, appointments, services })
     (a) => a.date >= start && a.date <= end
   );
 
-  // Para admin: lista de funcionários (não admins) ordenada por comissão desc
-  const employees = profiles.filter((p) => p.role === "employee" && p.active);
+  // Para admin: apenas manicures têm comissão
+  const employees = profiles.filter((p) => p.role === "manicure" && p.active);
 
   const totalCommission = employees.reduce((sum, emp) => {
     const empTotal = monthApts
@@ -349,7 +350,7 @@ export default function Comissoes({ profile, profiles, appointments, services })
           <div style={{ fontSize: 13, color: B.muted, marginTop: 2 }}>
             {isAdmin
               ? `Resumo de comissões por funcionário`
-              : `Seus ganhos como funcionário — 50% dos serviços concluídos`}
+              : `Seus ganhos como manicure — 55% dos serviços concluídos`}
           </div>
         </div>
 
@@ -423,15 +424,24 @@ export default function Comissoes({ profile, profiles, appointments, services })
         </div>
       )}
 
-      {/* ── Visão FUNCIONÁRIO ─────────────────────────────────────── */}
-      {!isAdmin && (
+      {/* ── Visão MANICURE ────────────────────────────────────────── */}
+      {!isAdmin && profile?.role === "manicure" && (
         <MyCommission
           profile={profile}
           apts={monthApts}
           services={services}
+          clients={clients}
           year={year}
           month={month}
         />
+      )}
+      {/* ── Recepcionista não tem comissão ────────────────────────── */}
+      {!isAdmin && profile?.role === "receptionist" && (
+        <Card style={{ padding: 32, textAlign: "center" }}>
+          <DollarSign size={36} color={B.border} style={{ margin: "0 auto 10px" }} />
+          <div style={{ fontSize: 15, fontWeight: 600, color: B.text }}>Comissões não aplicáveis</div>
+          <div style={{ fontSize: 13, color: B.muted, marginTop: 4 }}>Recepcionistas não recebem comissão por atendimento</div>
+        </Card>
       )}
     </div>
   );

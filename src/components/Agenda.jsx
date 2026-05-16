@@ -98,22 +98,35 @@ for (let h = 8; h < 20; h++) {
 
 export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointment, onDeleteAppointment, clients, services, setPage, profiles, profile }) {
   const { isMobile } = useBreakpoint();
-  const isAdmin = profile?.role === "admin";
-  const [date,      setDate]    = useState(todayStr);
-  const [sel,       setSel]     = useState(null);
-  const [editModal, setEditModal] = useState(false);
-  const [editForm,  setEditForm] = useState({});
-  const [saving,    setSaving]  = useState(false);
+  const isAdmin        = profile?.role === "admin";
+  const isReceptionist = profile?.role === "receptionist";
+  const isManicure     = profile?.role === "manicure";
+  const canSeeFaturamento = isAdmin || isReceptionist;
+  const [date,       setDate]     = useState(todayStr);
+  const [sel,        setSel]      = useState(null);
+  const [editModal,  setEditModal]  = useState(false);
+  const [editForm,   setEditForm]   = useState({});
+  const [saving,     setSaving]   = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
+  const [payModal,   setPayModal]   = useState(false);
 
+  // Manicure vê apenas seus próprios agendamentos na agenda
   const dayApts = appointments
-    .filter(a => a.date === date && a.status !== "cancelled" && a.status !== "no_show")
+    .filter(a => {
+      if (a.date !== date) return false;
+      if (a.status === "cancelled" || a.status === "no_show") return false;
+      if (isManicure && a.employeeId !== profile?.id) return false;
+      return true;
+    })
     .sort((a, b) => a.time.localeCompare(b.time));
 
   // Ordena por duração DECRESCENTE antes de montar o colMap (maior = coluna 0 = z-index menor)
   const colMap = buildColumns(dayApts, services);
 
-  const markStatus = async (id, status) => { await onUpdateStatus(id, status); setSel(null); };
+  const markStatus = async (id, status, paymentMethod = null) => {
+    await onUpdateStatus(id, status, paymentMethod);
+    setSel(null);
+  };
 
   const openEdit = (a) => {
     setEditForm({
@@ -199,7 +212,7 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
           {selSvs.map(s => (
             <div key={s.id} style={{ display: "flex", justifyContent: "space-between", marginTop: 3 }}>
               <span style={{ fontWeight: 500 }}>{s.name}</span>
-              {isAdmin && <span style={{ color: B.brand, fontWeight: 600 }}>{currency(s.price)}</span>}
+              {canSeeFaturamento && <span style={{ color: B.brand, fontWeight: 600 }}>{currency(s.price)}</span>}
             </div>
           ))}
         </div>
@@ -208,8 +221,8 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
           ["Horário",   selA.time],
           ["Duração total", `${selTotalDur} min`],
           ["Atendente", selEmp ? selEmp.name : "—"],
-          ...(isAdmin && selA.discount ? [["Desconto", selA.discount.type === "percent" ? `${selA.discount.value}%` : currency(selA.discount.value)]] : []),
-          ...(isAdmin ? [["Total", currency(applyDiscount(selTotalPrice, selA.discount))]] : []),
+          ...(canSeeFaturamento && selA.discount ? [["Desconto", selA.discount.type === "percent" ? `${selA.discount.value}%` : currency(selA.discount.value)]] : []),
+          ...(canSeeFaturamento ? [["Total", currency(applyDiscount(selTotalPrice, selA.discount))]] : []),
         ].map(([k, v]) => (
           <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
             <span style={{ color: B.muted }}>{k}</span>
@@ -226,7 +239,7 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
 
       {selA.status === "scheduled" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 12 }}>
-          <Btn variant="success" onClick={() => markStatus(selA.id, "completed")}>
+          <Btn variant="success" onClick={() => setPayModal(true)}>
             <Check size={13} /> Concluir atendimento
           </Btn>
           <Btn variant="ghost" onClick={() => markStatus(selA.id, "no_show")} style={{ color: "#d97706", borderColor: "#fde68a", background: "#fffbeb" }}>
@@ -264,7 +277,7 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
         ["Agendamentos", dayApts.length],
         ["Concluídos",   dayApts.filter(a => a.status === "completed").length],
         ["Pendentes",    dayApts.filter(a => a.status === "scheduled").length],
-        ...(isAdmin ? [["Faturamento", currency(dayApts.filter(a => a.status === "completed").reduce((s, a) => {
+        ...(canSeeFaturamento ? [["Faturamento", currency(dayApts.filter(a => a.status === "completed").reduce((s, a) => {
           const svList = a.serviceIds?.length > 0
             ? a.serviceIds.map(sid => services.find(x => x.id === sid)).filter(Boolean)
             : services.filter(x => x.id === a.serviceId);
@@ -395,7 +408,7 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
                     <span style={{ fontSize: 10, fontWeight: 600, color: col, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "35%", flexShrink: 0 }}>
                       {svList.map(s => s.name).join("+")}
                     </span>
-                    {isAdmin && (() => { const tot = svList.reduce((t,s)=>t+s.price,0); return (
+                    {canSeeFaturamento && (() => { const tot = svList.reduce((t,s)=>t+s.price,0); return (
                       <span style={{ fontSize: 10, fontWeight: 700, color: col, flexShrink: 0 }}>
                         {currency(applyDiscount(tot, a.discount))}
                       </span>
@@ -414,7 +427,7 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
                     <div style={{ fontSize: 10, fontWeight: 600, color: col, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.2, opacity: 0.8 }}>
                       {svList.map(s => s.name).join(" + ")}{emp ? ` · ${emp.name.split(" ")[0]}` : ""}
                     </div>
-                    {isAdmin && (() => { const tot = svList.reduce((t,s)=>t+s.price,0); return (
+                    {canSeeFaturamento && (() => { const tot = svList.reduce((t,s)=>t+s.price,0); return (
                       <div style={{ fontSize: isMedium ? 10 : 11, fontWeight: 700, color: col, marginTop: isMedium ? 0 : "auto" }}>
                         {currency(applyDiscount(tot, a.discount))}
                       </div>
@@ -431,6 +444,41 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
 
   return (
     <>
+      {/* ── Modal: forma de pagamento ──────────────────────────── */}
+      {payModal && selA && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 400 }}>
+          <Card style={{ padding: 28, width: 360, maxWidth: "92vw" }}>
+            <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 4 }}>Concluir atendimento</div>
+            <div style={{ fontSize: 13, color: B.muted, marginBottom: 22 }}>Selecione a forma de pagamento</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+              {[
+                { value: "card", label: "Cartão",   emoji: "💳" },
+                { value: "pix",  label: "Pix",      emoji: "📱" },
+                { value: "cash", label: "Dinheiro", emoji: "💵" },
+              ].map(({ value, label, emoji }) => (
+                <button key={value} onClick={() => { markStatus(selA.id, "completed", value); setPayModal(false); }} style={{
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+                  padding: "18px 8px", border: `2px solid ${B.border}`, borderRadius: 12,
+                  background: "#fff", cursor: "pointer", fontFamily: "inherit",
+                  transition: "border-color 0.15s, background 0.15s",
+                }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = B.brand; e.currentTarget.style.background = B.light; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = B.border; e.currentTarget.style.background = "#fff"; }}
+                >
+                  <span style={{ fontSize: 30 }}>{emoji}</span>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: B.text }}>{label}</span>
+                </button>
+              ))}
+            </div>
+            <div style={{ marginTop: 16, textAlign: "center" }}>
+              <button onClick={() => setPayModal(false)} style={{ fontSize: 13, color: B.muted, background: "none", border: "none", cursor: "pointer", padding: "4px 12px" }}>
+                Cancelar
+              </button>
+            </div>
+          </Card>
+        </div>
+      )}
+
       {/* ── Modal editar agendamento ───────────────────────────── */}
       {editModal && selA && selCl && selSv && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300 }}>

@@ -7,17 +7,21 @@ const NAV_BASE = [
   { id: "agenda",     label: "Agenda",      Icon: Calendar },
   { id: "clientes",   label: "Clientes",    Icon: Users },
   { id: "servicos",   label: "Serviços",    Icon: Scissors },
-  { id: "comissoes",  label: "Comissões",   Icon: BadgeDollarSign },
 ];
 
-const NAV_ADMIN = [
-  { id: "usuarios",   label: "Usuários",    Icon: Shield },
-];
+const NAV_COMMISSION = { id: "comissoes", label: "Comissões", Icon: BadgeDollarSign };
+const NAV_ADMIN      = { id: "usuarios",  label: "Usuários",  Icon: Shield };
 
 export default function Sidebar({ page, setPage, profile, onLogout }) {
   const { isMobile } = useBreakpoint();
-  const isAdmin = profile?.role === "admin";
-  const NAV = isAdmin ? [...NAV_BASE, ...NAV_ADMIN] : NAV_BASE;
+  const isAdmin     = profile?.role === "admin";
+  const isManicure  = profile?.role === "manicure";
+
+  const NAV = isAdmin
+    ? [...NAV_BASE, NAV_COMMISSION, NAV_ADMIN]
+    : isManicure
+      ? [...NAV_BASE, NAV_COMMISSION]
+      : NAV_BASE;
 
   // ── Mobile: header + bottom nav ───────────────────────────────
   if (isMobile) {

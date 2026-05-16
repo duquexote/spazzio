@@ -17,16 +17,17 @@ function normalizeAppointment(a, serviceIds = null) {
   // se não fornecido, usa o service_id legado
   const ids = serviceIds ?? (a.service_id ? [a.service_id] : []);
   return {
-    id:         a.id,
-    clientId:   a.client_id,
-    serviceId:  ids[0] || a.service_id || null, // compatibilidade
-    serviceIds: ids,                             // múltiplos serviços
-    employeeId: a.employee_id || null,
-    date:       a.date,
-    time:       a.time,
-    status:     a.status,
-    notes:      a.notes || "",
-    discount:   a.discount_type
+    id:            a.id,
+    clientId:      a.client_id,
+    serviceId:     ids[0] || a.service_id || null, // compatibilidade
+    serviceIds:    ids,                             // múltiplos serviços
+    employeeId:    a.employee_id || null,
+    date:          a.date,
+    time:          a.time,
+    status:        a.status,
+    notes:         a.notes || "",
+    paymentMethod: a.payment_method || null,
+    discount:      a.discount_type
       ? { type: a.discount_type, value: Number(a.discount_value) }
       : null,
   };
@@ -178,9 +179,13 @@ export default function App() {
 
     if (row) setAppointments(p => [...p, normalizeAppointment(row, serviceIds)]);
   };
-  const updateAppointmentStatus = async (id, status) => {
-    await supabase.from("appointments").update({ status }).eq("id", id);
-    setAppointments(p => p.map(a => a.id === id ? { ...a, status } : a));
+  const updateAppointmentStatus = async (id, status, paymentMethod = null) => {
+    const payload = { status };
+    if (paymentMethod) payload.payment_method = paymentMethod;
+    await supabase.from("appointments").update(payload).eq("id", id);
+    setAppointments(p => p.map(a => a.id === id
+      ? { ...a, status, paymentMethod: paymentMethod || a.paymentMethod }
+      : a));
   };
 
   const updateAppointment = async (id, data) => {
@@ -328,6 +333,7 @@ export default function App() {
             profiles={profiles}
             appointments={appointments}
             services={services}
+            clients={clients}
           />
         )}
       </main>

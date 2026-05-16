@@ -30,7 +30,8 @@ function Stat({ Icon, label, value, sub, accent }) {
 
 export default function Dashboard({ appointments, clients, services, setPage, profile, profiles }) {
   const { isMobile } = useBreakpoint();
-  const isAdmin = profile?.role === "admin";
+  const isAdmin       = profile?.role === "admin";
+  const isManicure    = profile?.role === "manicure";
 
   const now = new Date();
   const mStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
@@ -38,11 +39,15 @@ export default function Dashboard({ appointments, clients, services, setPage, pr
   const yStart = `${now.getFullYear()}-01-01`;
   const yEnd   = `${now.getFullYear()}-12-31`;
 
-  // ── Faturamento ────────────────────────────────────────────────
+  // Cálculo multi-serviço
   function calcRevenue(apts) {
     return apts.reduce((s, a) => {
-      const sv = services.find(x => x.id === a.serviceId);
-      return s + (sv ? applyDiscount(sv.price, a.discount) : 0);
+      const ids = a.serviceIds?.length > 0 ? a.serviceIds : (a.serviceId ? [a.serviceId] : []);
+      const base = ids.reduce((t, sid) => {
+        const sv = services.find(x => x.id === sid);
+        return t + (sv ? sv.price : 0);
+      }, 0);
+      return s + applyDiscount(base, a.discount);
     }, 0);
   }
 
@@ -50,6 +55,16 @@ export default function Dashboard({ appointments, clients, services, setPage, pr
   const todayCompleted = completedAll.filter(a => a.date === todayStr);
   const monthCompleted = completedAll.filter(a => a.date >= mStart && a.date <= mEnd);
   const yearCompleted  = completedAll.filter(a => a.date >= yStart && a.date <= yEnd);
+
+  // Para manicure: filtra só os próprios atendimentos
+  const myCompleted      = completedAll.filter(a => a.employeeId === profile?.id);
+  const myTodayCompleted = myCompleted.filter(a => a.date === todayStr);
+  const myMonthCompleted = myCompleted.filter(a => a.date >= mStart && a.date <= mEnd);
+
+  const COMMISSION_RATE = 0.55;
+  const myMonthRevenue  = calcRevenue(myMonthCompleted);
+  const myTodayRevenue  = calcRevenue(myTodayCompleted);
+  const myCommission    = myMonthRevenue * COMMISSION_RATE;
 
   const todayRevenue  = calcRevenue(todayCompleted);
   const monthRevenue  = calcRevenue(monthCompleted);
@@ -60,6 +75,7 @@ export default function Dashboard({ appointments, clients, services, setPage, pr
   const todayApts = appointments
     .filter(a => a.date === todayStr && a.status !== "cancelled" && a.status !== "no_show")
     .sort((a, b) => a.time.localeCompare(b.time));
+  const myTodayApts = todayApts.filter(a => a.employeeId === profile?.id);
 
   // ── Aniversariantes do mês ───────────────────────────────────
   const currentMonth = String(now.getMonth() + 1).padStart(2, "0");
@@ -90,13 +106,30 @@ export default function Dashboard({ appointments, clients, services, setPage, pr
     <div>
       <div style={{ marginBottom: 26 }}>
         <SectionTitle>
-          {isAdmin ? "Bom dia, Admin 👑" : `Olá, ${profile?.name?.split(" ")[0] || "Funcionário"}!`}
+          {isAdmin ? "Bom dia, Admin" : `Olá, ${profile?.name?.split(" ")[0] || "Funcionária"}!`}
         </SectionTitle>
         <div style={{ fontSize: 14, color: B.muted }}>{ptFull(todayStr)} — {weekDay(todayStr)}</div>
       </div>
 
-      {/* ── Funcionário: apenas faturamento do dia ── */}
-      {!isAdmin && (
+      {/* ── Manicure: seus próprios dados ── */}
+      {isManicure && (
+        <>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)",
+            gap: isMobile ? 10 : 14,
+            marginBottom: 20,
+          }}>
+            <Stat Icon={DollarSign}    label="Meu faturamento hoje"   value={currency(myTodayRevenue)} sub={`${myTodayCompleted.length} atendimentos`} />
+            <Stat Icon={CheckCircle}   label="Concluídos hoje"        value={myTodayCompleted.length}  accent="#16a34a" />
+            <Stat Icon={CalendarCheck} label="Meus agendam. hoje"     value={myTodayApts.length}       accent="#d97706" />
+            <Stat Icon={TrendingUp}    label="Comissão do mês (55%)"  value={currency(myCommission)}   sub={`de ${currency(myMonthRevenue)}`} accent="#0891b2" />
+          </div>
+        </>
+      )}
+
+      {/* ── Recepcionista: faturamento global do dia ── */}
+      {!isAdmin && !isManicure && (
         <>
           <div style={{
             display: "grid",
@@ -118,12 +151,21 @@ export default function Dashboard({ appointments, clients, services, setPage, pr
             display: "grid",
             gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)",
             gap: isMobile ? 10 : 14,
-            marginBottom: 20,
+            marginBottom: isMobile ? 10 : 14,
           }}>
             <Stat Icon={DollarSign}    label="Faturamento do mês"    value={currency(monthRevenue)}  sub={`${monthCompleted.length} atendimentos`} />
             <Stat Icon={TrendingUp}    label="Faturamento do ano"     value={currency(yearRevenue)}   sub={`${yearCompleted.length} atendimentos`} accent="#0891b2" />
             <Stat Icon={CalendarCheck} label="Agendamentos futuros"   value={agendados.length}        sub="a partir de hoje" accent="#d97706" />
             <Stat Icon={CheckCircle}   label="Ticket médio (mês)"     value={currency(ticket)}        sub="por atendimento" accent="#16a34a" />
+          </div>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(2, 1fr)",
+            gap: isMobile ? 10 : 14,
+            marginBottom: 20,
+          }}>
+            <Stat Icon={DollarSign}    label="Faturamento hoje"        value={currency(todayRevenue)}   sub={`${todayCompleted.length} atendimentos concluídos`} accent="#16a34a" />
+            <Stat Icon={TrendingUp}    label="Meu faturamento do mês"  value={currency(myMonthRevenue)} sub={`${myMonthCompleted.length} atendimentos meus`}     accent="#7c3aed" />
           </div>
 
           {/* ── Previsão de caixa ── */}
@@ -285,7 +327,7 @@ export default function Dashboard({ appointments, clients, services, setPage, pr
                       <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cl?.name}</div>
                       <div style={{ fontSize: 11, color: B.muted }}>{sv?.name}{emp ? ` · ${emp.name}` : ""}</div>
                     </div>
-                    {!isMobile && isAdmin && (
+                    {!isMobile && (isAdmin || profile?.role === "receptionist") && (
                       <div style={{ fontSize: 13, fontWeight: 700 }}>{sv ? currency(applyDiscount(sv.price, a.discount)) : "—"}</div>
                     )}
                     <StatusBadge status={a.status} />

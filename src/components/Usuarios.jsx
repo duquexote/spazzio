@@ -9,10 +9,11 @@ import Avatar from "./ui/Avatar";
 import Field from "./ui/Field";
 import { useBreakpoint } from "../hooks/useBreakpoint";
 
-const ROLE_LABEL = { admin: "Administrador", employee: "Funcionário" };
+const ROLE_LABEL = { admin: "Administrador", manicure: "Manicure", receptionist: "Recepcionista" };
 const ROLE_COLOR = {
-  admin:    { color: B.brand,    bg: B.light,   border: B.border },
-  employee: { color: "#0891b2",  bg: "#ecfeff", border: "#a5f3fc" },
+  admin:       { color: B.brand,    bg: B.light,   border: B.border },
+  manicure:    { color: "#0891b2",  bg: "#ecfeff", border: "#a5f3fc" },
+  receptionist:{ color: "#7c3aed", bg: "#f5f3ff", border: "#c4b5fd" },
 };
 
 export default function Usuarios({ profiles, session, onRefresh, onUpdateProfile, onDeleteProfile, onChangeMyPassword }) {
@@ -20,14 +21,14 @@ export default function Usuarios({ profiles, session, onRefresh, onUpdateProfile
 
   // ── Criar usuário ─────────────────────────────────────────────
   const [createModal, setCreateModal] = useState(false);
-  const [createForm,  setCreateForm]  = useState({ name: "", email: "", password: "", role: "employee" });
+  const [createForm,  setCreateForm]  = useState({ name: "", email: "", password: "", role: "manicure" });
   const [createErr,   setCreateErr]   = useState("");
   const [creating,    setCreating]    = useState(false);
   const [showCreatePw, setShowCreatePw] = useState(false);
 
   // ── Editar usuário ────────────────────────────────────────────
   const [editTarget,  setEditTarget]  = useState(null); // profile obj
-  const [editForm,    setEditForm]    = useState({ name: "", role: "employee", newPassword: "" });
+  const [editForm,    setEditForm]    = useState({ name: "", role: "manicure", newPassword: "" });
   const [editErr,     setEditErr]     = useState("");
   const [saving,      setSaving]      = useState(false);
   const [confirmDel,  setConfirmDel]  = useState(false);
@@ -40,7 +41,7 @@ export default function Usuarios({ profiles, session, onRefresh, onUpdateProfile
   const [pwSaving, setPwSaving] = useState(false);
 
   // ── Criar ─────────────────────────────────────────────────────
-  const openCreate = () => { setCreateForm({ name: "", email: "", password: "", role: "employee" }); setCreateErr(""); setCreateModal(true); };
+  const openCreate = () => { setCreateForm({ name: "", email: "", password: "", role: "manicure" }); setCreateErr(""); setCreateModal(true); };
   const createUser = async () => {
     if (!createForm.name || !createForm.email || !createForm.password) return;
     setCreating(true); setCreateErr("");
@@ -123,7 +124,7 @@ export default function Usuarios({ profiles, session, onRefresh, onUpdateProfile
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, color: rc.color, background: rc.bg, border: `1px solid ${rc.border}`, display: "flex", alignItems: "center", gap: 4 }}>
                     {p.role === "admin" ? <Shield size={10} /> : <User2 size={10} />}
-                    {ROLE_LABEL[p.role]}
+                    {ROLE_LABEL[p.role] || p.role}
                   </span>
                   <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, color: p.active ? "#16a34a" : "#9ca3af", background: p.active ? "#f0fdf4" : "#f9fafb", border: `1px solid ${p.active ? "#86efac" : "#e5e7eb"}` }}>
                     {p.active ? "Ativo" : "Inativo"}
@@ -189,14 +190,22 @@ export default function Usuarios({ profiles, session, onRefresh, onUpdateProfile
               </div>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Tipo de acesso *</label>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  {[{ value: "employee", label: "Funcionário", Icon: User2, desc: "Vê apenas o dia" }, { value: "admin", label: "Administrador", Icon: Shield, desc: "Acesso completo" }].map(({ value, label, Icon, desc }) => (
-                    <button key={value} onClick={() => setCreateForm(f => ({ ...f, role: value }))} type="button" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "12px 8px", border: `2px solid ${createForm.role === value ? B.brand : B.border}`, borderRadius: 10, cursor: "pointer", background: createForm.role === value ? B.light : "#fff", fontFamily: "inherit", transition: "all 0.15s" }}>
-                      <Icon size={20} color={createForm.role === value ? B.brand : B.muted} />
-                      <div style={{ fontWeight: 700, fontSize: 13, color: createForm.role === value ? B.brand : B.text }}>{label}</div>
-                      <div style={{ fontSize: 11, color: B.muted }}>{desc}</div>
-                    </button>
-                  ))}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                  {[
+                    { value: "manicure",     label: "Manicure",      Icon: User2,  desc: "Vê seus apts" },
+                    { value: "receptionist", label: "Recepcionista",  Icon: User2,  desc: "Vê faturamento" },
+                    { value: "admin",        label: "Administrador",  Icon: Shield, desc: "Acesso completo" },
+                  ].map(({ value, label, Icon, desc }) => {
+                    const active = createForm.role === value;
+                    const rc = ROLE_COLOR[value];
+                    return (
+                      <button key={value} onClick={() => setCreateForm(f => ({ ...f, role: value }))} type="button" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "12px 8px", border: `2px solid ${active ? rc.color : B.border}`, borderRadius: 10, cursor: "pointer", background: active ? rc.bg : "#fff", fontFamily: "inherit", transition: "all 0.15s" }}>
+                        <Icon size={20} color={active ? rc.color : B.muted} />
+                        <div style={{ fontWeight: 700, fontSize: 12, color: active ? rc.color : B.text }}>{label}</div>
+                        <div style={{ fontSize: 10, color: B.muted }}>{desc}</div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
               {createErr && <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 8, padding: "9px 13px", fontSize: 13, color: "#dc2626" }}>{createErr}</div>}
@@ -224,13 +233,21 @@ export default function Usuarios({ profiles, session, onRefresh, onUpdateProfile
 
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Tipo de acesso</label>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  {[{ value: "employee", label: "Funcionário", Icon: User2 }, { value: "admin", label: "Administrador", Icon: Shield }].map(({ value, label, Icon }) => (
-                    <button key={value} onClick={() => setEditForm(f => ({ ...f, role: value }))} type="button" style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", border: `2px solid ${editForm.role === value ? B.brand : B.border}`, borderRadius: 10, cursor: "pointer", background: editForm.role === value ? B.light : "#fff", fontFamily: "inherit" }}>
-                      <Icon size={16} color={editForm.role === value ? B.brand : B.muted} />
-                      <span style={{ fontWeight: 600, fontSize: 13, color: editForm.role === value ? B.brand : B.text }}>{label}</span>
-                    </button>
-                  ))}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                  {[
+                    { value: "manicure",     label: "Manicure",      Icon: User2  },
+                    { value: "receptionist", label: "Recepcionista",  Icon: User2  },
+                    { value: "admin",        label: "Administrador",  Icon: Shield },
+                  ].map(({ value, label, Icon }) => {
+                    const active = editForm.role === value;
+                    const rc = ROLE_COLOR[value];
+                    return (
+                      <button key={value} onClick={() => setEditForm(f => ({ ...f, role: value }))} type="button" style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 8px", border: `2px solid ${active ? rc.color : B.border}`, borderRadius: 10, cursor: "pointer", background: active ? rc.bg : "#fff", fontFamily: "inherit" }}>
+                        <Icon size={14} color={active ? rc.color : B.muted} />
+                        <span style={{ fontWeight: 600, fontSize: 12, color: active ? rc.color : B.text }}>{label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
