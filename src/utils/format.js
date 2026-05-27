@@ -1,6 +1,24 @@
 export const currency = v =>
   "R$ " + v.toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 
+export const formatPaymentMethod = (method) => {
+  if (!method) return "—";
+  try {
+    const parsed = JSON.parse(method);
+    if (typeof parsed === "object" && parsed !== null) {
+      const names = { card: "Cartão", pix: "Pix", cash: "Dinheiro", voucher: "Voucher" };
+      return Object.entries(parsed)
+        .filter(([_, val]) => val > 0)
+        .map(([key, val]) => `${names[key] || key} (${currency(val)})`)
+        .join(" + ");
+    }
+  } catch (e) {
+    // Não é JSON, fluxo legado
+  }
+  const names = { card: "Cartão", pix: "Pix", cash: "Dinheiro", voucher: "Voucher" };
+  return names[method] || method;
+};
+
 export const applyDiscount = (price, d) => {
   if (!d) return price;
   return d.type === "percent" ? price * (1 - d.value / 100) : Math.max(0, price - d.value);

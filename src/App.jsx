@@ -181,10 +181,21 @@ export default function App() {
   };
   const updateAppointmentStatus = async (id, status, paymentMethod = null) => {
     const payload = { status };
-    if (paymentMethod) payload.payment_method = paymentMethod;
+    if (paymentMethod) {
+      payload.payment_method = paymentMethod;
+      if (paymentMethod === "voucher") {
+        payload.discount_type = "percent";
+        payload.discount_value = 100;
+      }
+    }
     await supabase.from("appointments").update(payload).eq("id", id);
     setAppointments(p => p.map(a => a.id === id
-      ? { ...a, status, paymentMethod: paymentMethod || a.paymentMethod }
+      ? {
+          ...a,
+          status,
+          paymentMethod: paymentMethod || a.paymentMethod,
+          ...(paymentMethod === "voucher" ? { discount: { type: "percent", value: 100 } } : {})
+        }
       : a));
   };
 

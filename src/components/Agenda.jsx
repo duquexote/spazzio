@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { Calendar, ChevronLeft, ChevronRight, Phone, Check, X, Plus, UserX, Edit2, Trash2 } from "lucide-react";
 import { B } from "../constants/brand";
 import { todayStr } from "../constants/data";
-import { currency, applyDiscount, ptFull, weekDay, addDays } from "../utils/format";
+import { currency, applyDiscount, ptFull, weekDay, addDays, formatPaymentMethod } from "../utils/format";
 import Card from "./ui/Card";
 import Avatar from "./ui/Avatar";
 import Btn from "./ui/Btn";
@@ -109,6 +109,8 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
   const [saving,     setSaving]   = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const [payModal,   setPayModal]   = useState(false);
+  const [isSplitting, setIsSplitting] = useState(false);
+  const [splitValues, setSplitValues] = useState({ card: "", pix: "", cash: "" });
   const dateInputRef = useRef(null);
 
   // Manicure vê apenas seus próprios agendamentos na agenda
@@ -224,6 +226,7 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
           ["Atendente", selEmp ? selEmp.name : "—"],
           ...(canSeeFaturamento && selA.discount ? [["Desconto", selA.discount.type === "percent" ? `${selA.discount.value}%` : currency(selA.discount.value)]] : []),
           ...(canSeeFaturamento ? [["Total", currency(applyDiscount(selTotalPrice, selA.discount))]] : []),
+          ...(canSeeFaturamento && selA.status === "completed" ? [["Pagamento", formatPaymentMethod(selA.paymentMethod)]] : []),
         ].map(([k, v]) => (
           <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
             <span style={{ color: B.muted }}>{k}</span>
@@ -478,39 +481,241 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
     </div>
   );
 
+  const totalToPay = selA ? applyDiscount(selTotalPrice, selA.discount) : 0;
+
+  const fillRemaining = (key) => {
+    const currentValues = { ...splitValues };
+    let otherSum = 0;
+    Object.keys(currentValues).forEach(k => {
+      if (k !== key) {
+        otherSum += Number(currentValues[k]) || 0;
+      }
+    });
+    const remaining = Math.max(0, totalToPay - otherSum);
+    const formattedRemaining = Math.round(remaining * 100) / 100;
+    setSplitValues({ ...currentValues, [key]: formattedRemaining || "" });
+  };
+
   return (
     <>
       {/* ── Modal: forma de pagamento ──────────────────────────── */}
       {payModal && selA && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 400 }}>
-          <Card style={{ padding: 28, width: 360, maxWidth: "92vw" }}>
+          <Card style={{ padding: 28, width: isSplitting ? 420 : 360, maxWidth: "92vw", transition: "width 0.2s" }}>
             <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 4 }}>Concluir atendimento</div>
-            <div style={{ fontSize: 13, color: B.muted, marginBottom: 22 }}>Selecione a forma de pagamento</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-              {[
-                { value: "card", label: "Cartão",   emoji: "💳" },
-                { value: "pix",  label: "Pix",      emoji: "📱" },
-                { value: "cash", label: "Dinheiro", emoji: "💵" },
-              ].map(({ value, label, emoji }) => (
-                <button key={value} onClick={() => { markStatus(selA.id, "completed", value); setPayModal(false); }} style={{
-                  display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
-                  padding: "18px 8px", border: `2px solid ${B.border}`, borderRadius: 12,
-                  background: "#fff", cursor: "pointer", fontFamily: "inherit",
-                  transition: "border-color 0.15s, background 0.15s",
-                }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = B.brand; e.currentTarget.style.background = B.light; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = B.border; e.currentTarget.style.background = "#fff"; }}
+            <div style={{ fontSize: 13, color: B.muted, marginBottom: 22 }}>
+              {isSplitting ? "Informe os valores de cada forma de pagamento" : "Selecione a forma de pagamento"}
+            </div>
+
+            {!isSplitting ? (
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10, marginBottom: 16 }}>
+                  {[
+                    { value: "card", label: "Cartão",   emoji: "💳" },
+                    { value: "pix",  label: "Pix",      emoji: "📱" },
+                    { value: "cash", label: "Dinheiro", emoji: "💵" },
+                    { value: "voucher", label: "Voucher", emoji: "🎫" },
+                  ].map(({ value, label, emoji }) => (
+                    <button
+                      key={value}
+                      onClick={() => {
+                        markStatus(selA.id, "completed", value);
+                        setPayModal(false);
+                      }}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "18px 8px",
+                        border: `2px solid ${B.border}`,
+                        borderRadius: 12,
+                        background: "#fff",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        transition: "border-color 0.15s, background 0.15s",
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = B.brand; e.currentTarget.style.background = B.light; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = B.border; e.currentTarget.style.background = "#fff"; }}
+                    >
+                      <span style={{ fontSize: 30 }}>{emoji}</span>
+                      <span style={{ fontWeight: 700, fontSize: 13, color: B.text }}>{label}</span>
+                      {value === "voucher" && (
+                        <span style={{ fontSize: 10, color: "#16a34a", fontWeight: 600 }}>100% desc.</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => setIsSplitting(true)}
+                  style={{
+                    width: "100%",
+                    padding: "10px",
+                    borderRadius: 8,
+                    border: `1.5px dashed ${B.brand}`,
+                    background: B.light,
+                    color: B.brand,
+                    fontFamily: "inherit",
+                    fontWeight: 600,
+                    fontSize: 13,
+                    cursor: "pointer",
+                    textAlign: "center",
+                    marginBottom: 16,
+                  }}
                 >
-                  <span style={{ fontSize: 30 }}>{emoji}</span>
-                  <span style={{ fontWeight: 700, fontSize: 13, color: B.text }}>{label}</span>
+                  ➕ Dividir pagamento em múltiplos métodos
                 </button>
-              ))}
-            </div>
-            <div style={{ marginTop: 16, textAlign: "center" }}>
-              <button onClick={() => setPayModal(false)} style={{ fontSize: 13, color: B.muted, background: "none", border: "none", cursor: "pointer", padding: "4px 12px" }}>
-                Cancelar
-              </button>
-            </div>
+              </>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: B.light, padding: "10px 14px", borderRadius: 8, marginBottom: 4 }}>
+                  <span style={{ fontSize: 13, color: B.muted, fontWeight: 500 }}>Total a pagar:</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: B.brand }}>{currency(totalToPay)}</span>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {[
+                    { key: "card", label: "Cartão", emoji: "💳" },
+                    { key: "pix", label: "Pix", emoji: "📱" },
+                    { key: "cash", label: "Dinheiro", emoji: "💵" },
+                  ].map(({ key, label, emoji }) => (
+                    <div key={key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ width: 85, display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: B.text }}>
+                        <span>{emoji}</span>
+                        <span>{label}</span>
+                      </div>
+                      <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "center" }}>
+                        <span style={{ position: "absolute", left: 10, fontSize: 12, color: B.muted, fontWeight: 600 }}>R$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0,00"
+                          value={splitValues[key]}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setSplitValues(prev => ({ ...prev, [key]: val }));
+                          }}
+                          style={{
+                            width: "100%",
+                            padding: "8px 8px 8px 28px",
+                            borderRadius: 8,
+                            border: `1.5px solid ${B.border}`,
+                            fontFamily: "inherit",
+                            fontSize: 13,
+                            fontWeight: 600,
+                            outline: "none",
+                          }}
+                        />
+                      </div>
+                      <button
+                        onClick={() => fillRemaining(key)}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 8,
+                          border: `1.5px solid ${B.brand}`,
+                          background: B.light,
+                          color: B.brand,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Restante
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {(() => {
+                  const cardVal = Number(splitValues.card) || 0;
+                  const pixVal = Number(splitValues.pix) || 0;
+                  const cashVal = Number(splitValues.cash) || 0;
+                  const sum = cardVal + pixVal + cashVal;
+                  const diff = totalToPay - sum;
+                  const absDiff = Math.abs(diff);
+
+                  let statusText = "";
+                  let statusColor = "";
+                  let isValid = false;
+
+                  if (absDiff < 0.01) {
+                    statusText = "Soma exata!";
+                    statusColor = "#16a34a"; // verde
+                    isValid = true;
+                  } else if (diff > 0) {
+                    statusText = `Falta pagar ${currency(absDiff)}`;
+                    statusColor = "#dc2626"; // vermelho
+                  } else {
+                    statusText = `Excedente de ${currency(absDiff)}`;
+                    statusColor = "#d97706"; // laranja
+                  }
+
+                  return (
+                    <div style={{ marginTop: 8 }}>
+                      <div style={{ display: "flex", justifyContent: "center", fontSize: 13, fontWeight: 700, color: statusColor, marginBottom: 16, background: `${statusColor}12`, padding: "8px 12px", borderRadius: 8 }}>
+                        {statusText}
+                      </div>
+
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <Btn
+                          variant="ghost"
+                          onClick={() => {
+                            setIsSplitting(false);
+                            setSplitValues({ card: "", pix: "", cash: "" });
+                          }}
+                          style={{ flex: 1 }}
+                        >
+                          Voltar
+                        </Btn>
+                        <Btn
+                          variant="primary"
+                          disabled={!isValid}
+                          onClick={() => {
+                            const finalSplit = {};
+                            if (cardVal > 0) finalSplit.card = cardVal;
+                            if (pixVal > 0) finalSplit.pix = pixVal;
+                            if (cashVal > 0) finalSplit.cash = cashVal;
+
+                            const entries = Object.entries(finalSplit);
+                            let methodValue = "";
+                            if (entries.length === 1) {
+                              methodValue = entries[0][0];
+                            } else {
+                              methodValue = JSON.stringify(finalSplit);
+                            }
+                            markStatus(selA.id, "completed", methodValue);
+                            setPayModal(false);
+                            setIsSplitting(false);
+                            setSplitValues({ card: "", pix: "", cash: "" });
+                          }}
+                          style={{ flex: 1 }}
+                        >
+                          Confirmar
+                        </Btn>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {!isSplitting && (
+              <div style={{ textAlign: "center" }}>
+                <button
+                  onClick={() => {
+                    setPayModal(false);
+                    setIsSplitting(false);
+                    setSplitValues({ card: "", pix: "", cash: "" });
+                  }}
+                  style={{ fontSize: 13, color: B.muted, background: "none", border: "none", cursor: "pointer", padding: "4px 12px" }}
+                >
+                  Cancelar
+                </button>
+              </div>
+            )}
           </Card>
         </div>
       )}
