@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Calendar, ChevronLeft, ChevronRight, Phone, Check, X, Plus, UserX, Edit2, Trash2 } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, Phone, Check, X, Plus, UserX, Edit2, Trash2, Tag, Percent, Banknote } from "lucide-react";
 import { B } from "../constants/brand";
 import { todayStr } from "../constants/data";
 import { currency, applyDiscount, ptFull, weekDay, addDays, formatPaymentMethod } from "../utils/format";
@@ -251,6 +251,14 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
           </Btn>
           <Btn variant="danger" onClick={() => markStatus(selA.id, "cancelled")}>
             <X size={13} /> Cancelou
+          </Btn>
+        </div>
+      )}
+
+      {selA.status === "completed" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 12 }}>
+          <Btn variant="outline" onClick={() => markStatus(selA.id, "scheduled")} style={{ color: B.brand, borderColor: B.brand }}>
+            <X size={13} /> Desfazer conclusão
           </Btn>
         </div>
       )}
@@ -776,6 +784,52 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
                   ))}
                 </div>
               </div>
+
+              {/* Seção de Desconto */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8, marginBottom: 4 }}>
+                <div style={{ fontWeight: 600, fontSize: 12, display: "flex", alignItems: "center", gap: 6, color: "#374151", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  <Tag size={13} color={B.brand} /> Desconto
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditForm(f => ({ ...f, discountOn: !f.discountOn, discountValue: "" }))}
+                  style={{ width: 36, height: 20, borderRadius: 10, border: "none", cursor: "pointer", position: "relative", background: editForm.discountOn ? B.brand : "#e5e7eb", transition: "background 0.2s" }}
+                >
+                  <div style={{ position: "absolute", top: 2, left: editForm.discountOn ? 18 : 2, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s" }} />
+                </button>
+              </div>
+              {editForm.discountOn && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, background: "#f9fafb", padding: 12, borderRadius: 8 }}>
+                  <div style={{ display: "flex", gap: 7 }}>
+                    {[
+                      { id: "percent", label: "Percentual (%)", Icon: Percent },
+                      { id: "fixed", label: "Valor fixo (R$)", Icon: Banknote }
+                    ].map(({ id, label, Icon }) => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setEditForm(f => ({ ...f, discountType: id, discountValue: "" }))}
+                        style={{
+                          flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                          padding: "6px 8px", border: `1.5px solid ${editForm.discountType === id ? B.brand : B.border}`,
+                          borderRadius: 8, background: editForm.discountType === id ? B.light : "#fff",
+                          cursor: "pointer", fontFamily: "inherit", fontWeight: 600, fontSize: 11,
+                          color: editForm.discountType === id ? B.brand : B.muted,
+                        }}
+                      >
+                        <Icon size={12} /> {label}
+                      </button>
+                    ))}
+                  </div>
+                  <Field
+                    label={editForm.discountType === "percent" ? "Percentual (%)" : "Valor (R$)"}
+                    type="number"
+                    value={editForm.discountValue}
+                    onChange={v => setEditForm(f => ({ ...f, discountValue: v }))}
+                    placeholder={editForm.discountType === "percent" ? "Ex: 10" : "Ex: 20"}
+                  />
+                </div>
+              )}
 
               <TextArea label="Observações" value={editForm.notes} onChange={v => setEditForm(f => ({ ...f, notes: v }))} placeholder="Observações..." />
             </div>

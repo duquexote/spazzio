@@ -181,7 +181,16 @@ export default function App() {
   };
   const updateAppointmentStatus = async (id, status, paymentMethod = null) => {
     const payload = { status };
-    if (paymentMethod) {
+    const currentApt = appointments.find(a => a.id === id);
+    const wasVoucher = currentApt?.paymentMethod === "voucher";
+
+    if (status === "scheduled") {
+      payload.payment_method = null;
+      if (wasVoucher) {
+        payload.discount_type = null;
+        payload.discount_value = null;
+      }
+    } else if (paymentMethod) {
       payload.payment_method = paymentMethod;
       if (paymentMethod === "voucher") {
         payload.discount_type = "percent";
@@ -193,8 +202,8 @@ export default function App() {
       ? {
           ...a,
           status,
-          paymentMethod: paymentMethod || a.paymentMethod,
-          ...(paymentMethod === "voucher" ? { discount: { type: "percent", value: 100 } } : {})
+          paymentMethod: status === "scheduled" ? null : (paymentMethod || a.paymentMethod),
+          discount: (status === "scheduled" && wasVoucher) ? null : (paymentMethod === "voucher" ? { type: "percent", value: 100 } : a.discount)
         }
       : a));
   };
