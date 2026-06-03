@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { Calendar, DollarSign, CheckCircle, CalendarCheck, TrendingUp, Gift } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Calendar, DollarSign, CheckCircle, CalendarCheck, TrendingUp, Gift, ChevronLeft, ChevronRight } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { B } from "../constants/brand";
 import { todayStr } from "../constants/data";
@@ -10,6 +10,18 @@ import Btn from "./ui/Btn";
 import SectionTitle from "./ui/SectionTitle";
 import StatusBadge from "./ui/StatusBadge";
 import { useBreakpoint } from "../hooks/useBreakpoint";
+
+function monthLabel(year, month) {
+  return new Date(year, month - 1, 1).toLocaleString("pt-BR", { month: "long", year: "numeric" });
+}
+
+function monthRange(year, month) {
+  const pad = (n) => String(n).padStart(2, "0");
+  const start = `${year}-${pad(month)}-01`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const end = `${year}-${pad(month)}-${pad(lastDay)}`;
+  return { start, end };
+}
 
 function Stat({ Icon, label, value, sub, accent }) {
   return (
@@ -34,10 +46,21 @@ export default function Dashboard({ appointments, clients, services, setPage, pr
   const isManicure    = profile?.role === "manicure";
 
   const now = new Date();
-  const mStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
-  const mEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0];
-  const yStart = `${now.getFullYear()}-01-01`;
-  const yEnd   = `${now.getFullYear()}-12-31`;
+  const [year, setYear]   = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
+
+  const prevMonth = () => {
+    if (month === 1) { setMonth(12); setYear(y => y - 1); }
+    else setMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (month === 12) { setMonth(1); setYear(y => y + 1); }
+    else setMonth(m => m + 1);
+  };
+
+  const { start: mStart, end: mEnd } = monthRange(year, month);
+  const yStart = `${year}-01-01`;
+  const yEnd   = `${year}-12-31`;
 
   // Cálculo multi-serviço
   function calcRevenue(apts) {
@@ -78,7 +101,7 @@ export default function Dashboard({ appointments, clients, services, setPage, pr
   const myTodayApts = todayApts.filter(a => a.employeeId === profile?.id);
 
   // ── Aniversariantes do mês ───────────────────────────────────
-  const currentMonth = String(now.getMonth() + 1).padStart(2, "0");
+  const currentMonth = String(month).padStart(2, "0");
   const birthdayClients = clients
     .filter(c => c.birthdate && c.birthdate.slice(5, 7) === currentMonth)
     .sort((a, b) => a.birthdate.slice(8, 10).localeCompare(b.birthdate.slice(8, 10)));
@@ -94,21 +117,36 @@ export default function Dashboard({ appointments, clients, services, setPage, pr
   const chartData = useMemo(() => {
     const mo = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
     return Array.from({ length: 6 }, (_, i) => {
-      const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+      const d = new Date(year, month - 1 - (5 - i), 1);
       const s = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split("T")[0];
       const e = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split("T")[0];
       const total = calcRevenue(completedAll.filter(a => a.date >= s && a.date <= e));
       return { name: mo[d.getMonth()], valor: +total.toFixed(2) };
     });
-  }, [appointments, services]);
+  }, [appointments, services, year, month]);
 
   return (
     <div>
       <div style={{ marginBottom: 26 }}>
-        <SectionTitle>
-          {isAdmin ? "Bom dia, Admin" : `Olá, ${profile?.name?.split(" ")[0] || "Funcionária"}!`}
-        </SectionTitle>
-        <div style={{ fontSize: 14, color: B.muted }}>{ptFull(todayStr)} — {weekDay(todayStr)}</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10 }}>
+          <div>
+            <SectionTitle>
+              {isAdmin ? "Bom dia, Admin" : `Olá, ${profile?.name?.split(" ")[0] || "Funcionária"}!`}
+            </SectionTitle>
+            <div style={{ fontSize: 14, color: B.muted }}>{ptFull(todayStr)} — {weekDay(todayStr)}</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <button onClick={prevMonth} style={{ border: `1.5px solid ${B.border}`, borderRadius: 8, padding: "7px 10px", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center" }}>
+              <ChevronLeft size={15} color={B.text} />
+            </button>
+            <span style={{ minWidth: 150, textAlign: "center", fontWeight: 600, fontSize: 14, color: B.text, textTransform: "capitalize" }}>
+              {monthLabel(year, month)}
+            </span>
+            <button onClick={nextMonth} style={{ border: `1.5px solid ${B.border}`, borderRadius: 8, padding: "7px 10px", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center" }}>
+              <ChevronRight size={15} color={B.text} />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* ── Manicure: seus próprios dados ── */}
@@ -224,7 +262,7 @@ export default function Dashboard({ appointments, clients, services, setPage, pr
             gap: 14, marginBottom: 20,
           }}>
             <Card style={{ padding: "20px 22px" }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: B.text, marginBottom: 14 }}>Faturamento — últimos 6 meses</div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: B.text, marginBottom: 14 }}>Faturamento — 6 meses até {monthLabel(year, month)}</div>
               <ResponsiveContainer width="100%" height={170}>
                 <BarChart data={chartData} barSize={28}>
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: B.muted }} axisLine={false} tickLine={false} />
