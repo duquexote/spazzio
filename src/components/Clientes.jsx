@@ -1,13 +1,14 @@
 import { useState } from "react";
-import { Search, Plus, Phone, Edit2, History, X, Check, Users, Trash2, CreditCard } from "lucide-react";
+import { Search, Plus, Phone, Edit2, History, X, Check, Trash2, CreditCard } from "lucide-react";
 import { B } from "../constants/brand";
-import { currency, applyDiscount, ptShort, weekDay } from "../utils/format";
+import { currency, applyDiscount, ptShort, weekDay, normalize } from "../utils/format";
 import Card from "./ui/Card";
 import Avatar from "./ui/Avatar";
 import Btn from "./ui/Btn";
 import Field from "./ui/Field";
 import TextArea from "./ui/TextArea";
 import StatusBadge from "./ui/StatusBadge";
+import ClientesInsights from "./ClientesInsights";
 import { useBreakpoint } from "../hooks/useBreakpoint";
 
 export default function Clientes({ clients, onAdd, onUpdate, onDelete, appointments, services, setPage }) {
@@ -23,7 +24,7 @@ export default function Clientes({ clients, onAdd, onUpdate, onDelete, appointme
   const [showProfile, setShowProfile] = useState(false);
 
   const filtered = clients.filter(c =>
-    c.name.toLowerCase().includes(q.toLowerCase()) || c.phone.includes(q)
+    normalize(c.name).includes(normalize(q)) || c.phone.includes(q)
   );
 
   const openAdd  = () => { setForm({ name: "", phone: "", cpf: "", birthdate: "", notes: "" }); setEditId(null); setModal(true); };
@@ -201,13 +202,7 @@ export default function Clientes({ clients, onAdd, onUpdate, onDelete, appointme
       </Card>
     </div>
   ) : (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-      <div style={{ textAlign: "center" }}>
-        <Users size={44} color={B.border} style={{ margin: "0 auto 10px" }} />
-        <div style={{ fontSize: 15, fontWeight: 600, color: B.text }}>Selecione uma cliente</div>
-        <div style={{ fontSize: 13, color: B.muted, marginTop: 4 }}>Clique numa cliente para ver o perfil e histórico</div>
-      </div>
-    </div>
+    <ClientesInsights clients={clients} appointments={appointments} services={services} />
   );
 
   // Lista de clientes

@@ -50,3 +50,7 @@ export const addDays = (s, n) => {
 
 export const initials = name =>
   name.split(" ").slice(0, 2).map(n => n[0]).join("").toUpperCase();
+
+// Remove acentos/diacríticos para permitir busca "café" === "cafe"
+export const normalize = s =>
+  (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();

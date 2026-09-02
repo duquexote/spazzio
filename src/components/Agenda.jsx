@@ -111,6 +111,8 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
   const [payModal,   setPayModal]   = useState(false);
   const [isSplitting, setIsSplitting] = useState(false);
   const [splitValues, setSplitValues] = useState({ card: "", pix: "", cash: "" });
+  const [payError,   setPayError]   = useState("");
+  const [payLoading, setPayLoading] = useState(false);
   const dateInputRef = useRef(null);
 
   // Manicure vê apenas seus próprios agendamentos na agenda
@@ -127,8 +129,10 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
   const colMap = buildColumns(dayApts, services);
 
   const markStatus = async (id, status, paymentMethod = null) => {
-    await onUpdateStatus(id, status, paymentMethod);
+    const err = await onUpdateStatus(id, status, paymentMethod);
+    if (err) return err;
     setSel(null);
+    return null;
   };
 
   const openEdit = (a) => {
@@ -243,7 +247,7 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
 
       {selA.status === "scheduled" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 12 }}>
-          <Btn variant="success" onClick={() => setPayModal(true)}>
+          <Btn variant="success" onClick={() => { setPayError(""); setPayModal(true); }}>
             <Check size={13} /> Concluir atendimento
           </Btn>
           <Btn variant="ghost" onClick={() => markStatus(selA.id, "no_show")} style={{ color: "#d97706", borderColor: "#fde68a", background: "#fffbeb" }}>
@@ -282,14 +286,40 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
   );
 
   // ── Resumo do dia ────────────────────────────────────────────
+  const dayCompleted = dayApts.filter(a => a.status === "completed");
+
+  // Soma por forma de pagamento (considera pagamentos divididos, salvos como JSON)
+  const paymentTotals = { card: 0, pix: 0, cash: 0, voucher: 0 };
+  dayCompleted.forEach(a => {
+    const svList = a.serviceIds?.length > 0
+      ? a.serviceIds.map(sid => services.find(x => x.id === sid)).filter(Boolean)
+      : services.filter(x => x.id === a.serviceId);
+    const total = svList.reduce((t, sv) => t + sv.price, 0);
+    const finalTotal = applyDiscount(total, a.discount);
+
+    let split = null;
+    try {
+      const parsed = JSON.parse(a.paymentMethod);
+      if (typeof parsed === "object" && parsed !== null) split = parsed;
+    } catch (e) { /* pagamento único, não é JSON */ }
+
+    if (split) {
+      Object.entries(split).forEach(([method, val]) => {
+        if (paymentTotals[method] !== undefined) paymentTotals[method] += Number(val) || 0;
+      });
+    } else if (a.paymentMethod && paymentTotals[a.paymentMethod] !== undefined) {
+      paymentTotals[a.paymentMethod] += finalTotal;
+    }
+  });
+
   const summaryCard = (
     <Card style={{ padding: 16 }}>
       <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Resumo do dia</div>
       {[
         ["Agendamentos", dayApts.length],
-        ["Concluídos",   dayApts.filter(a => a.status === "completed").length],
+        ["Concluídos",   dayCompleted.length],
         ["Pendentes",    dayApts.filter(a => a.status === "scheduled").length],
-        ...(canSeeFaturamento ? [["Faturamento", currency(dayApts.filter(a => a.status === "completed").reduce((s, a) => {
+        ...(canSeeFaturamento ? [["Faturamento", currency(dayCompleted.reduce((s, a) => {
           const svList = a.serviceIds?.length > 0
             ? a.serviceIds.map(sid => services.find(x => x.id === sid)).filter(Boolean)
             : services.filter(x => x.id === a.serviceId);
@@ -302,6 +332,25 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
           <span style={{ fontWeight: 600 }}>{v}</span>
         </div>
       ))}
+
+      {canSeeFaturamento && (
+        <>
+          <div style={{ fontWeight: 700, fontSize: 12, marginTop: 14, marginBottom: 8, color: B.muted, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            Por forma de pagamento
+          </div>
+          {[
+            ["📱 Pix",      paymentTotals.pix],
+            ["💳 Cartão",   paymentTotals.card],
+            ["💵 Dinheiro", paymentTotals.cash],
+            ...(paymentTotals.voucher > 0 ? [["🎫 Voucher", paymentTotals.voucher]] : []),
+          ].map(([k, v]) => (
+            <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "4px 0", borderBottom: "1px solid #f9fafb" }}>
+              <span style={{ color: B.muted }}>{k}</span>
+              <span style={{ fontWeight: 600, color: B.brand }}>{currency(v)}</span>
+            </div>
+          ))}
+        </>
+      )}
     </Card>
   );
 
@@ -526,8 +575,13 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
                   ].map(({ value, label, emoji }) => (
                     <button
                       key={value}
-                      onClick={() => {
-                        markStatus(selA.id, "completed", value);
+                      disabled={payLoading}
+                      onClick={async () => {
+                        setPayError("");
+                        setPayLoading(true);
+                        const err = await markStatus(selA.id, "completed", value);
+                        setPayLoading(false);
+                        if (err) { setPayError(err); return; }
                         setPayModal(false);
                       }}
                       style={{
@@ -539,7 +593,8 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
                         border: `2px solid ${B.border}`,
                         borderRadius: 12,
                         background: "#fff",
-                        cursor: "pointer",
+                        cursor: payLoading ? "default" : "pointer",
+                        opacity: payLoading ? 0.6 : 1,
                         fontFamily: "inherit",
                         transition: "border-color 0.15s, background 0.15s",
                       }}
@@ -554,6 +609,12 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
                     </button>
                   ))}
                 </div>
+
+                {payError && (
+                  <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 8, padding: "9px 13px", fontSize: 12, color: "#dc2626", marginBottom: 14 }}>
+                    Não foi possível salvar: {payError}
+                  </div>
+                )}
 
                 <button
                   onClick={() => setIsSplitting(true)}
@@ -667,6 +728,12 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
                         {statusText}
                       </div>
 
+                      {payError && (
+                        <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 8, padding: "9px 13px", fontSize: 12, color: "#dc2626", marginBottom: 14 }}>
+                          Não foi possível salvar: {payError}
+                        </div>
+                      )}
+
                       <div style={{ display: "flex", gap: 8 }}>
                         <Btn
                           variant="ghost"
@@ -680,8 +747,8 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
                         </Btn>
                         <Btn
                           variant="primary"
-                          disabled={!isValid}
-                          onClick={() => {
+                          disabled={!isValid || payLoading}
+                          onClick={async () => {
                             const finalSplit = {};
                             if (cardVal > 0) finalSplit.card = cardVal;
                             if (pixVal > 0) finalSplit.pix = pixVal;
@@ -694,14 +761,18 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
                             } else {
                               methodValue = JSON.stringify(finalSplit);
                             }
-                            markStatus(selA.id, "completed", methodValue);
+                            setPayError("");
+                            setPayLoading(true);
+                            const err = await markStatus(selA.id, "completed", methodValue);
+                            setPayLoading(false);
+                            if (err) { setPayError(err); return; }
                             setPayModal(false);
                             setIsSplitting(false);
                             setSplitValues({ card: "", pix: "", cash: "" });
                           }}
                           style={{ flex: 1 }}
                         >
-                          Confirmar
+                          {payLoading ? "Salvando…" : "Confirmar"}
                         </Btn>
                       </div>
                     </div>
@@ -717,6 +788,7 @@ export default function Agenda({ appointments, onUpdateStatus, onUpdateAppointme
                     setPayModal(false);
                     setIsSplitting(false);
                     setSplitValues({ card: "", pix: "", cash: "" });
+                    setPayError("");
                   }}
                   style={{ fontSize: 13, color: B.muted, background: "none", border: "none", cursor: "pointer", padding: "4px 12px" }}
                 >

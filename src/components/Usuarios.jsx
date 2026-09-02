@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { supabase } from "../supabase";
 import { B } from "../constants/brand";
-import { Plus, Shield, User2, X, Check, Power, Edit2, Trash2, Lock, KeyRound, Eye, EyeOff } from "lucide-react";
+import { Plus, Shield, User2, X, Check, Power, Edit2, Trash2, Lock, KeyRound, Eye, EyeOff, Users, ChevronDown, ChevronUp } from "lucide-react";
 import Card from "./ui/Card";
 import Btn from "./ui/Btn";
 import SectionTitle from "./ui/SectionTitle";
@@ -16,8 +16,21 @@ const ROLE_COLOR = {
   receptionist:{ color: "#7c3aed", bg: "#f5f3ff", border: "#c4b5fd" },
 };
 
-export default function Usuarios({ profiles, session, onRefresh, onUpdateProfile, onDeleteProfile, onChangeMyPassword }) {
+export default function Usuarios({ profiles, session, onRefresh, onUpdateProfile, onDeleteProfile, onChangeMyPassword, appointments = [], clients = [] }) {
   const { isMobile } = useBreakpoint();
+
+  // ── Clientes atendidos por funcionária ──────────────────────────
+  const [expandedId, setExpandedId] = useState(null);
+  const clientsAttendedBy = (profileId) => {
+    const byClient = {};
+    appointments
+      .filter(a => a.employeeId === profileId && a.status === "completed")
+      .forEach(a => { byClient[a.clientId] = (byClient[a.clientId] || 0) + 1; });
+    return Object.entries(byClient)
+      .map(([clientId, count]) => ({ client: clients.find(c => c.id === clientId), count }))
+      .filter(x => x.client)
+      .sort((a, b) => b.count - a.count);
+  };
 
   // ── Criar usuário ─────────────────────────────────────────────
   const [createModal, setCreateModal] = useState(false);
@@ -109,8 +122,10 @@ export default function Usuarios({ profiles, session, onRefresh, onUpdateProfile
       {/* ── Lista ──────────────────────────────────────────────── */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {profiles.map(p => {
-          const rc     = ROLE_COLOR[p.role] || ROLE_COLOR.employee;
-          const isMe   = p.id === session?.user?.id;
+          const rc       = ROLE_COLOR[p.role] || ROLE_COLOR.employee;
+          const isMe     = p.id === session?.user?.id;
+          const expanded = expandedId === p.id;
+          const attended = expanded ? clientsAttendedBy(p.id) : [];
           return (
             <Card key={p.id} style={{ padding: "16px 20px", opacity: p.active ? 1 : 0.6 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
@@ -129,6 +144,12 @@ export default function Usuarios({ profiles, session, onRefresh, onUpdateProfile
                   <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, color: p.active ? "#16a34a" : "#9ca3af", background: p.active ? "#f0fdf4" : "#f9fafb", border: `1px solid ${p.active ? "#86efac" : "#e5e7eb"}` }}>
                     {p.active ? "Ativo" : "Inativo"}
                   </span>
+                  {p.role !== "admin" && (
+                    <button onClick={() => setExpandedId(expanded ? null : p.id)} title="Clientes atendidos" style={{ display: "flex", alignItems: "center", gap: 4, border: `1.5px solid ${B.border}`, borderRadius: 8, padding: "5px 9px", background: expanded ? B.light : "#fff", cursor: "pointer" }}>
+                      <Users size={14} color={B.muted} />
+                      {expanded ? <ChevronUp size={12} color={B.muted} /> : <ChevronDown size={12} color={B.muted} />}
+                    </button>
+                  )}
                   <button onClick={() => openEdit(p)} title="Editar" style={{ border: `1.5px solid ${B.border}`, borderRadius: 8, padding: "5px 9px", background: "#fff", cursor: "pointer" }}>
                     <Edit2 size={14} color={B.muted} />
                   </button>
@@ -137,6 +158,30 @@ export default function Usuarios({ profiles, session, onRefresh, onUpdateProfile
                   </button>
                 </div>
               </div>
+
+              {expanded && (
+                <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #f3f4f6" }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: B.muted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>
+                    Clientes atendidos ({attended.length})
+                  </div>
+                  {attended.length === 0
+                    ? <div style={{ fontSize: 13, color: B.muted }}>Nenhum atendimento concluído ainda</div>
+                    : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {attended.map(({ client, count }) => (
+                          <div key={client.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "6px 8px", borderRadius: 8, background: "#fafafa" }}>
+                            <Avatar name={client.name} size={26} />
+                            <div style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{client.name}</div>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: B.brand, background: B.light, borderRadius: 10, padding: "1px 8px", flexShrink: 0 }}>
+                              {count} atend.
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  }
+                </div>
+              )}
             </Card>
           );
         })}

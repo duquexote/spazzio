@@ -99,6 +99,8 @@ export default function Dashboard({ appointments, clients, services, setPage, pr
     .filter(a => a.date === todayStr && a.status !== "cancelled" && a.status !== "no_show")
     .sort((a, b) => a.time.localeCompare(b.time));
   const myTodayApts = todayApts.filter(a => a.employeeId === profile?.id);
+  // Manicure só deve ver a própria agenda; admin/recepcionista veem tudo
+  const agendaHojeApts = isManicure ? myTodayApts : todayApts;
 
   // ── Aniversariantes do mês ───────────────────────────────────
   const currentMonth = String(month).padStart(2, "0");
@@ -345,11 +347,11 @@ export default function Dashboard({ appointments, clients, services, setPage, pr
           <div style={{ fontWeight: 700, fontSize: 14, color: B.text }}>Agenda de hoje</div>
           <Btn small variant="outline" onClick={() => setPage("agenda")}><Calendar size={13} /> Ver agenda</Btn>
         </div>
-        {todayApts.length === 0
+        {agendaHojeApts.length === 0
           ? <div style={{ fontSize: 13, color: B.muted, padding: "16px 0", textAlign: "center" }}>Nenhum agendamento para hoje</div>
           : (
             <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              {todayApts.map(a => {
+              {agendaHojeApts.map(a => {
                 const cl = clients.find(c => c.id === a.clientId);
                 const sv = services.find(s => s.id === a.serviceId);
                 const emp = profiles.find(p => p.id === a.employeeId);

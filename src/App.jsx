@@ -197,7 +197,13 @@ export default function App() {
         payload.discount_value = 100;
       }
     }
-    await supabase.from("appointments").update(payload).eq("id", id);
+    const { error } = await supabase.from("appointments").update(payload).eq("id", id);
+    if (error) {
+      // Não atualiza o estado local se o Supabase rejeitou a escrita —
+      // sem isso a tela mostrava "concluído" mesmo quando não persistiu no banco.
+      console.error("Erro ao atualizar status do agendamento:", error);
+      return error.message || "Erro ao salvar no banco de dados";
+    }
     setAppointments(p => p.map(a => a.id === id
       ? {
           ...a,
@@ -206,6 +212,7 @@ export default function App() {
           discount: (status === "scheduled" && wasVoucher) ? null : (paymentMethod === "voucher" ? { type: "percent", value: 100 } : a.discount)
         }
       : a));
+    return null;
   };
 
   const updateAppointment = async (id, data) => {
@@ -342,6 +349,8 @@ export default function App() {
             onUpdateProfile={updateUserProfile}
             onDeleteProfile={deleteUserProfile}
             onChangeMyPassword={changeMyPassword}
+            appointments={appointments}
+            clients={clients}
           />
         )}
         {page === "novo" && (
